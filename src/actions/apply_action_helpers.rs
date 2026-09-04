@@ -674,7 +674,7 @@ fn apply_dark_pendant_trigger(state: &mut State, attacking_player: usize, target
         return;
     };
     if !has_tool(defender, CardId::A4154DarkPendant)
-        || defender.get_energy_type() != Some(crate::models::EnergyType::Darkness)
+        || !defender.is_type(crate::models::EnergyType::Darkness)
         || state.hands[attacking_player].is_empty()
     {
         return;
@@ -805,10 +805,13 @@ pub(crate) fn handle_knockouts(
         // Record KOs dealt by an opponent's active attack (for revenge attacks such as
         // Marshadow's Revenge and Zarude's Dark Vengeance), along with the KO'd Pokemon's type.
         if is_from_active_attack && ko_receiver != attacking_ref.0 {
-            let ko_pokemon_type = state.in_play_pokemon[ko_receiver][ko_pokemon_idx]
+            // Record *every* type the KO'd Pokemon counted as in play, so a type-restricted
+            // revenge attack sees a dual-type Pokemon under either of its types.
+            let ko_pokemon_types = state.in_play_pokemon[ko_receiver][ko_pokemon_idx]
                 .as_ref()
-                .and_then(|pokemon| pokemon.get_energy_type());
-            state.record_knocked_out_by_opponent_attack(ko_pokemon_type);
+                .map(|pokemon| pokemon.get_energy_types())
+                .unwrap_or_default();
+            state.record_knocked_out_by_opponent_attack(&ko_pokemon_types);
         }
 
         // Every knockout counts against the player who lost the Pokemon, however it happened

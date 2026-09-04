@@ -95,8 +95,7 @@ fn maybe_defer_for_coin_reflip(
         SimpleAction::Attack(_) => {
             let attacker_is_fire = state.in_play_pokemon[action.actor][0]
                 .as_ref()
-                .and_then(|pokemon| pokemon.card.get_type())
-                .is_some_and(|energy_type| energy_type == EnergyType::Fire);
+                .is_some_and(|pokemon| pokemon.is_type(EnergyType::Fire));
             if !attacker_is_fire {
                 return None;
             }
@@ -693,7 +692,7 @@ fn apply_attach_tool(state: &mut State, actor: usize, in_play_idx: usize, tool_c
 
     // Steel Apron: "...recovers from all Special Conditions..." only for a [M] holder.
     if tools::has_tool(pokemon, crate::card_ids::CardId::A4153SteelApron)
-        && pokemon.get_energy_type() == Some(crate::models::EnergyType::Metal)
+        && pokemon.is_type(crate::models::EnergyType::Metal)
     {
         pokemon.cure_status_conditions();
     }

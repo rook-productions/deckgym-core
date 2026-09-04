@@ -263,6 +263,7 @@ fn forecast_ability_by_mechanic(
             panic!("NoOpponentStadiumInActive is a passive ability")
         }
         AbilityMechanic::DoubleGrassEnergy => panic!("DoubleGrassEnergy is a passive ability"),
+        AbilityMechanic::GrantedTypes { .. } => panic!("GrantedTypes is a passive ability"),
         AbilityMechanic::PreventOpponentActiveEvolution => {
             panic!("PreventOpponentActiveEvolution is a passive ability")
         }
@@ -425,7 +426,7 @@ fn discard_energy_to_increase_type_damage(
 fn heal_all_your_pokemon(amount: u32, energy_type: Option<EnergyType>) -> Outcomes {
     Outcomes::single_fn(move |_rng, state, action| {
         for pokemon in state.in_play_pokemon[action.actor].iter_mut().flatten() {
-            if energy_type.is_none_or(|t| pokemon.get_energy_type() == Some(t)) {
+            if energy_type.is_none_or(|t| pokemon.is_type(t)) {
                 pokemon.heal(amount);
             }
         }
@@ -515,7 +516,7 @@ fn attach_energy_from_zone_to_your_typed_outcome(energy_type: EnergyType) -> Out
     Outcomes::single_fn(move |_rng, state, action| {
         let choices = state
             .enumerate_in_play_pokemon(action.actor)
-            .filter(|(_, pokemon)| pokemon.card.get_type() == Some(energy_type))
+            .filter(|(_, pokemon)| pokemon.is_type(energy_type))
             .map(|(in_play_idx, _)| SimpleAction::Attach {
                 attachments: vec![(1, energy_type, in_play_idx)],
                 is_turn_energy: false,
@@ -1129,7 +1130,7 @@ fn vaporeon_wash_out(_: &mut StdRng, state: &mut State, action: &Action) {
     let possible_moves = state
         .enumerate_bench_pokemon(acting_player)
         .filter(|(_, pokemon)| {
-            pokemon.card.get_type() == Some(EnergyType::Water)
+            pokemon.is_type(EnergyType::Water)
                 && pokemon.attached_energy.contains(&EnergyType::Water)
         })
         .map(|(in_play_idx, _)| SimpleAction::MoveEnergy {
@@ -1182,7 +1183,7 @@ fn move_all_typed_energy_from_bench_to_active(
     let possible_moves = state
         .enumerate_bench_pokemon(acting_player)
         .filter_map(|(in_play_idx, pokemon)| {
-            if pokemon.card.get_type() != Some(energy_type) {
+            if !pokemon.is_type(energy_type) {
                 return None;
             }
             let amount = pokemon

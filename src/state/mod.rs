@@ -229,9 +229,8 @@ impl State {
     /// Block (no Pokémon on either side can be healed).
     pub(crate) fn refresh_ability_board_bonuses(&mut self) {
         let heal_blocked = (0..2).any(|player| {
-            self.enumerate_in_play_pokemon(player).any(|(_, pokemon)| {
-                pokemon.has_ability(&AbilityMechanic::NoHealingForAnyone)
-            })
+            self.enumerate_in_play_pokemon(player)
+                .any(|(_, pokemon)| pokemon.has_ability(&AbilityMechanic::NoHealingForAnyone))
         });
         let typed_hp_bonuses: [Vec<(EnergyType, u32)>; 2] = [
             collect_typed_hp_bonuses(self, 0),
@@ -626,7 +625,7 @@ impl State {
         // Steel Apron: "The [M] Pokémon this card is attached to ... can't be affected by any
         // Special Conditions." The immunity only applies to a [M] holder.
         if has_tool(pokemon, crate::card_ids::CardId::A4153SteelApron)
-            && pokemon.get_energy_type() == Some(EnergyType::Metal)
+            && pokemon.is_type(EnergyType::Metal)
         {
             debug!("Steel Apron: Pokémon is immune to status conditions");
             return;
@@ -693,7 +692,7 @@ impl State {
 
     pub(crate) fn num_in_play_of_type(&self, player: usize, energy: EnergyType) -> usize {
         self.enumerate_in_play_pokemon(player)
-            .filter(|(_, x)| x.get_energy_type() == Some(energy))
+            .filter(|(_, x)| x.is_type(energy))
             .count()
     }
 
@@ -858,14 +857,9 @@ impl State {
         }
     }
 
-    pub(crate) fn record_knocked_out_by_opponent_attack(
-        &mut self,
-        energy_type: Option<EnergyType>,
-    ) {
+    pub(crate) fn record_knocked_out_by_opponent_attack(&mut self, energy_types: &[EnergyType]) {
         self.knocked_out_by_opponent_attack_this_turn = true;
-        if let Some(energy_type) = energy_type {
-            self.knocked_out_types_this_turn.insert(energy_type);
-        }
+        self.knocked_out_types_this_turn.extend(energy_types);
     }
 
     /// Records that one of `player`'s own Pokemon was Knocked Out (for Kingambit's Overlord's
@@ -938,15 +932,13 @@ impl State {
 fn collect_typed_hp_bonuses(state: &State, player: usize) -> Vec<(EnergyType, u32)> {
     state
         .enumerate_in_play_pokemon(player)
-        .filter_map(
-            |(_, pokemon)| match pokemon.ability_mechanic() {
-                Some(AbilityMechanic::IncreaseHpOfYourTypedPokemon {
-                    energy_type,
-                    amount,
-                }) => Some((*energy_type, *amount)),
-                _ => None,
-            },
-        )
+        .filter_map(|(_, pokemon)| match pokemon.ability_mechanic() {
+            Some(AbilityMechanic::IncreaseHpOfYourTypedPokemon {
+                energy_type,
+                amount,
+            }) => Some((*energy_type, *amount)),
+            _ => None,
+        })
         .collect()
 }
 
