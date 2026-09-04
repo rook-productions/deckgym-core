@@ -189,3 +189,83 @@ fn test_power_of_alchemy_full_art_print_suppresses_too() {
         "B2 173 Alolan Muk should suppress Basic Abilities just like B2 097"
     );
 }
+
+/// Roaring Moon's Ancient Roar triggers from the `on_bench_from_hand` hook rather than from
+/// regular ability move generation. Roaring Moon is a Basic, so Power of Alchemy switches it off
+/// there too.
+#[test]
+fn test_power_of_alchemy_removes_a_basic_on_bench_from_hand_ability() {
+    let ancient_roar_offered = |opponent_active: CardId| {
+        let mut game = get_test_game_with_board(
+            vec![PlayedCard::from_id(CardId::A1001Bulbasaur)],
+            vec![
+                PlayedCard::from_id(opponent_active),
+                PlayedCard::from_id(CardId::A1057Psyduck),
+            ],
+        );
+        let mut state = game.get_state_clone();
+        state.hands[0].clear();
+        state.hands[0].push(deckgym::database::get_card_by_enum(
+            CardId::B3a047RoaringMoon,
+        ));
+        game.set_state(state);
+
+        let (_, actions) = game.get_state_clone().generate_possible_actions();
+        let place = actions
+            .into_iter()
+            .find(|a| matches!(&a.action, SimpleAction::Place(c, _) if c.get_name() == "Roaring Moon"))
+            .expect("Roaring Moon should be placeable on the bench");
+        game.apply_action(&place);
+
+        let (_, actions) = game.get_state_clone().generate_possible_actions();
+        actions
+            .iter()
+            .any(|a| matches!(a.action, SimpleAction::UseAbility { .. }))
+    };
+
+    assert!(
+        ancient_roar_offered(CardId::A1053Squirtle),
+        "Ancient Roar should normally be offered when Roaring Moon is benched"
+    );
+    assert!(
+        !ancient_roar_offered(CardId::B2097AlolanMuk),
+        "Power of Alchemy should remove Ancient Roar, a Basic Pokemon's on-bench Ability"
+    );
+}
+
+/// Teal Mask Ogerpon ex's Soothing Wind cures Special Conditions the moment it enters play. That
+/// on-entry hook reads the card rather than the board, so it needs the same suppression.
+#[test]
+fn test_power_of_alchemy_removes_the_on_entry_cure_of_a_basic_ability() {
+    let cured_on_entry = |opponent_active: CardId| {
+        let mut game = get_test_game_with_board(
+            vec![PlayedCard::from_id(CardId::A1001Bulbasaur).with_energy(vec![EnergyType::Grass])],
+            vec![PlayedCard::from_id(opponent_active)],
+        );
+        let mut state = game.get_state_clone();
+        state.apply_status_condition(0, 0, deckgym::models::StatusCondition::Poisoned);
+        assert!(state.get_active(0).is_poisoned());
+
+        let ogerpon = deckgym::database::get_card_by_enum(CardId::B2017TealMaskOgerponEx);
+        state.hands[0].clear();
+        state.hands[0].push(ogerpon.clone());
+        game.set_state(state);
+
+        game.apply_action(&Action {
+            actor: 0,
+            action: SimpleAction::Place(ogerpon, 1),
+            is_stack: false,
+        });
+
+        !game.get_state_clone().get_active(0).is_poisoned()
+    };
+
+    assert!(
+        cured_on_entry(CardId::A1053Squirtle),
+        "Soothing Wind should normally cure the Poison when Ogerpon enters play"
+    );
+    assert!(
+        !cured_on_entry(CardId::B2097AlolanMuk),
+        "Power of Alchemy should remove Soothing Wind, so the Poison stays"
+    );
+}

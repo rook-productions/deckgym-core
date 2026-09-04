@@ -4,7 +4,6 @@ use log::debug;
 use rand::{distributions::WeightedIndex, prelude::Distribution, rngs::StdRng, Rng};
 
 use crate::{
-    actions::effect_ability_mechanic_map::{get_ability_mechanic, has_ability_mechanic},
     actions::{
         abilities::AbilityMechanic,
         apply_abilities_action::forecast_ability,
@@ -786,11 +785,16 @@ pub(crate) fn apply_place_card(
     } else {
         state.remove_card_from_hand(actor, card);
         let placed_in_bench = index != 0;
-        if placed_in_bench && has_ability_mechanic(card, &AbilityMechanic::InfiltratingInspection) {
+        // The card is already in play at `index`, so read the Ability off the board: a Basic's
+        // Ability may be suppressed there (Alolan Muk's Power of Alchemy).
+        let in_play_ability = state.in_play_pokemon[actor][index]
+            .as_ref()
+            .and_then(|pokemon| pokemon.ability_mechanic());
+        if placed_in_bench && in_play_ability == Some(&AbilityMechanic::InfiltratingInspection) {
             debug!("Misdreavus's Infiltrating Inspection: Opponent's hand is revealed (no-op in AI context)");
         }
         if placed_in_bench {
-            on_bench_from_hand(actor, state, card, index);
+            on_bench_from_hand(actor, state, index);
         }
     }
 }
@@ -804,8 +808,12 @@ pub(crate) fn place_pokemon_in_play(state: &mut State, actor: usize, card: &Card
     state.in_play_pokemon[actor][index] = Some(played_card);
     state.refresh_starting_plains_bonus_for_idx(actor, index);
     state.refresh_double_grass_bonus_for_player(actor);
-    // SoothingWind (Ogerpon ex) / Flower Shield (Comfey): cure status conditions on entry.
-    if let Some(AbilityMechanic::SoothingWind { energy_type }) = get_ability_mechanic(card) {
+    // SoothingWind (Ogerpon ex) / Flower Shield (Comfey): cure status conditions on entry. Read
+    // the Ability off the board (both cards are Basics, so Power of Alchemy can remove it).
+    let entering_ability = state.in_play_pokemon[actor][index]
+        .as_ref()
+        .and_then(|pokemon| pokemon.ability_mechanic());
+    if let Some(AbilityMechanic::SoothingWind { energy_type }) = entering_ability {
         debug!("SoothingWind: Pokémon entered play – curing status conditions for player {actor}");
         state.apply_soothing_wind_for_player(actor, energy_type.as_ref());
     }
