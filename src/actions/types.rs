@@ -150,6 +150,20 @@ pub enum SimpleAction {
         in_play_idx: usize,
         damage: u32,
     },
+    /// Gyarados's Wild Swing: discard any number (possibly zero) of your own Benched Pokémon, then
+    /// deal the attack's resulting boosted damage to the opponent's Active Pokémon. Like
+    /// `DiscardOwnBenchedThenDamage` this is one action so the boosted damage is applied once.
+    DiscardOwnBenchedGroupThenDamage {
+        in_play_indices: Vec<usize>,
+        damage: u32,
+    },
+    /// Eldegoss's Float Up / Accelgor's Deck and Cover: shuffle one of your own Pokémon in play,
+    /// and everything attached to it (evolution cards, Tool), back into your deck. Attached Energy
+    /// goes to the discarded-Energy pile. Distinct from `ShuffleInPlayPokemonIntoDeck`, which
+    /// leaves the Tool and Energy behind.
+    ShuffleSelfAndAttachmentsIntoDeck {
+        in_play_idx: usize,
+    },
     /// Use an activated stadium effect (once per turn per player)
     UseStadium,
     /// Return a Pokemon in play to your hand (e.g., Ilima).
@@ -346,6 +360,18 @@ impl fmt::Display for SimpleAction {
                 damage,
             } => {
                 write!(f, "DiscardOwnBenchedThenDamage({in_play_idx}, {damage})")
+            }
+            SimpleAction::DiscardOwnBenchedGroupThenDamage {
+                in_play_indices,
+                damage,
+            } => {
+                write!(
+                    f,
+                    "DiscardOwnBenchedGroupThenDamage({in_play_indices:?}, {damage})"
+                )
+            }
+            SimpleAction::ShuffleSelfAndAttachmentsIntoDeck { in_play_idx } => {
+                write!(f, "ShuffleSelfAndAttachmentsIntoDeck({in_play_idx})")
             }
             SimpleAction::ReturnPokemonToHand { in_play_idx } => {
                 write!(f, "ReturnPokemonToHand({in_play_idx})")

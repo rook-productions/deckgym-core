@@ -25,6 +25,16 @@ pub enum CardEffect {
         attack_name: String,
         amount: u32,
     },
+    /// Like `IncreasedDamageForAttack`, but for a *spread* attack, whose bonus has to reach every
+    /// target rather than only the Active-to-Active damage that `hooks::modify_damage` sees (e.g.
+    /// Archeops's Wild Spin: "+20 damage to each of your opponent's Pokémon"). The attack's own
+    /// mechanic reads this off the attacker and folds it into every target's damage, so
+    /// `modify_damage` deliberately ignores it — using `IncreasedDamageForAttack` here would
+    /// double-count the bonus on the Active.
+    IncreasedSpreadDamageForAttack {
+        attack_name: String,
+        amount: u32,
+    },
     PreventAllDamageAndEffects,
     /// Prevent all damage from attacks if the incoming damage is at most `threshold` (e.g. Cascoon's Harden).
     PreventDamageIfLessOrEqual {

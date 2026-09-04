@@ -770,6 +770,38 @@ fn get_knocked_out(state: &State) -> Vec<(usize, usize)> {
     knockouts
 }
 
+/// Shuffle `player`'s Pokémon at `in_play_idx`, and everything attached to it, back into their
+/// deck: the card itself, every card it evolved from, and any attached Tool all go into the deck
+/// (which is then shuffled), while attached Energy returns to the discarded-Energy pile.
+///
+/// This is the "and all attached cards" form used by attacks like Eldegoss's Float Up and
+/// Accelgor's Deck and Cover. It differs from `apply_shuffle_in_play_pokemon_into_deck` (Professor
+/// Turo), which returns only the Pokémon cards and leaves the Tool and Energy behind.
+pub(crate) fn shuffle_in_play_pokemon_and_attachments_into_deck(
+    rng: &mut StdRng,
+    state: &mut State,
+    player: usize,
+    in_play_idx: usize,
+) {
+    let Some(pokemon) = state.in_play_pokemon[player][in_play_idx].take() else {
+        return;
+    };
+
+    let mut cards_to_shuffle = pokemon.cards_behind.clone();
+    cards_to_shuffle.push(pokemon.card.clone());
+    if let Some(tool) = pokemon.attached_tool.clone() {
+        cards_to_shuffle.push(tool);
+    }
+    state.decks[player].cards.extend(cards_to_shuffle);
+    state.discard_energies[player].extend(pokemon.attached_energy.iter().cloned());
+    state.decks[player].shuffle(false, rng);
+    state.refresh_double_grass_bonus_for_player(player);
+
+    if in_play_idx == 0 {
+        state.trigger_promotion_or_declare_winner(player);
+    }
+}
+
 /// Swap a bench pokemon into the active spot, clearing status/effects and setting turn flags.
 /// This is the swap portion of retreat without energy payment.
 pub(crate) fn apply_activate(player: usize, state: &mut State, bench_idx: usize) {

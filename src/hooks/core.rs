@@ -966,21 +966,28 @@ enum WeaknessApplication {
     Double,
 }
 
-const DAMAGE_UNAFFECTED_BY_WEAKNESS_EFFECT: &str =
-    "This attack's damage isn't affected by Weakness.";
+/// The Weakness-bypass clause. Matched as a substring so that attacks combining it with another
+/// clause share the bypass — e.g. Swift's "This attack's damage isn't affected by Weakness **or by
+/// any effects on your opponent's Active Pokémon**." (Ledian, Staryu, Starmie).
+const DAMAGE_UNAFFECTED_BY_WEAKNESS_CLAUSE: &str =
+    "This attack's damage isn't affected by Weakness";
 
 /// Sawk's Brick Break (and any card sharing this clause): the attack's damage ignores every effect
 /// on the opponent's Active Pokémon — ability-derived reductions/preventions, stored CardEffects,
 /// and damage-reducing Tools alike. See `attack_ignores_opponent_active_effects`.
-pub(crate) const DAMAGE_UNAFFECTED_BY_OPPONENT_ACTIVE_EFFECTS_EFFECT: &str =
-    "This attack's damage isn't affected by any effects on your opponent's Active Pokémon.";
+///
+/// Kept as the bare clause so it also matches sentences that lead with something else — Sawk's
+/// "This attack's damage isn't affected by ...", Mega Medicham ex's Chakra Fist (after its Energy
+/// bonus), and Swift's "... isn't affected by Weakness **or** by any effects on ...".
+const DAMAGE_UNAFFECTED_BY_OPPONENT_ACTIVE_EFFECTS_CLAUSE: &str =
+    "by any effects on your opponent's Active Pokémon";
 
 /// Whether an attack's effect text carries the "isn't affected by any effects on your opponent's
 /// Active Pokémon" clause. This is a substring match (not equality) so attacks that combine it with
 /// another clause — e.g. Mega Medicham ex's "Chakra Fist" (the [P]-Energy damage bonus plus this
-/// clause) — share Sawk's bypass behavior.
+/// clause) or Swift (the Weakness bypass plus this clause) — share Sawk's bypass behavior.
 pub(crate) fn attack_effect_ignores_opponent_active_effects(effect: Option<&str>) -> bool {
-    effect.is_some_and(|e| e.contains(DAMAGE_UNAFFECTED_BY_OPPONENT_ACTIVE_EFFECTS_EFFECT))
+    effect.is_some_and(|e| e.contains(DAMAGE_UNAFFECTED_BY_OPPONENT_ACTIVE_EFFECTS_CLAUSE))
 }
 
 #[derive(Clone, Copy, Default)]
@@ -992,7 +999,9 @@ pub(crate) struct DamageModifierContext<'a> {
 fn attack_effect_ignores_weakness(context: DamageModifierContext<'_>) -> bool {
     // TODO: If more attack text needs to alter damage-modifier stages, replace this
     // effect-string check with a typed attack metadata/damage-modifier capability.
-    context.attack_effect == Some(DAMAGE_UNAFFECTED_BY_WEAKNESS_EFFECT)
+    context
+        .attack_effect
+        .is_some_and(|e| e.contains(DAMAGE_UNAFFECTED_BY_WEAKNESS_CLAUSE))
 }
 
 fn attack_ignores_opponent_active_effects(context: DamageModifierContext<'_>) -> bool {

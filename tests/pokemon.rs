@@ -60,6 +60,8 @@ mod coalossal_coal_drop_test;
 mod coalossal_mountain_crush_test;
 #[path = "pokemon/comfey_flower_shield_test.rs"]
 mod comfey_flower_shield_test;
+#[path = "pokemon/conditional_damage_attacks_d_test.rs"]
+mod conditional_damage_attacks_d_test;
 #[path = "pokemon/corviknight_line_test.rs"]
 mod corviknight_line_test;
 #[path = "pokemon/cradily_stick_and_absorb_test.rs"]
@@ -282,6 +284,8 @@ mod sandslash_fury_swipes_test;
 mod sawk_test;
 #[path = "pokemon/scaling_damage_attacks_d_test.rs"]
 mod scaling_damage_attacks_d_test;
+#[path = "pokemon/self_relocation_attacks_d_test.rs"]
+mod self_relocation_attacks_d_test;
 #[path = "pokemon/shinx_hide_test.rs"]
 mod shinx_hide_test;
 #[path = "pokemon/silcoon_cascoon_cocoon_collector_test.rs"]
@@ -296,8 +300,12 @@ mod snorlax_massive_body_test;
 mod snover_ice_shard_test;
 #[path = "pokemon/spewpa_signs_of_evolution_test.rs"]
 mod spewpa_signs_of_evolution_test;
+#[path = "pokemon/spread_and_energy_attacks_d_test.rs"]
+mod spread_and_energy_attacks_d_test;
 #[path = "pokemon/sunflora_quick_grow_beam_test.rs"]
 mod sunflora_quick_grow_beam_test;
+#[path = "pokemon/swift_attacks_d_test.rs"]
+mod swift_attacks_d_test;
 #[path = "pokemon/swift_shot_test.rs"]
 mod swift_shot_test;
 #[path = "pokemon/sylveon_soothing_ribbon_test.rs"]

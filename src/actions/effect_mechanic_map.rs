@@ -1340,7 +1340,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "You may switch this Pokémon with 1 of your Benched Pokémon.",
         Mechanic::MaySwitchSelfWithBench,
     );
-    // map.insert("Switch this Pokémon with 1 of your Benched [L] Pokémon.", todo_implementation);
+    // Tapu Koko - Volt Switch
+    map.insert(
+        "Switch this Pokémon with 1 of your Benched [L] Pokémon.",
+        Mechanic::SwitchSelfWithBenchOfType {
+            energy_type: EnergyType::Lightning,
+        },
+    );
     map.insert(
         "Take 2 [M] Energy from your Energy Zone and attach it to 1 of your Benched Pokémon.",
         Mechanic::ChargeBench {
@@ -1412,7 +1418,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             energies: vec![EnergyType::Metal],
         },
     );
-    // map.insert("Take a [P] Energy from your Energy Zone and attach it to Mesprit or Azelf.", todo_implementation);
+    // Uxie - Mind Boost
+    map.insert(
+        "Take a [P] Energy from your Energy Zone and attach it to Mesprit or Azelf.",
+        Mechanic::AttachEnergyFromZoneToNamed {
+            energy_type: EnergyType::Psychic,
+            names: vec!["Mesprit".to_string(), "Azelf".to_string()],
+        },
+    );
     map.insert(
         "Take a [P] Energy from your Energy Zone and attach it to this Pokémon.",
         Mechanic::SelfChargeActive {
@@ -1539,7 +1552,11 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             damage: 20,
         },
     );
-    // map.insert("This attack also does 20 damage to 1 of your Pokémon.", todo_implementation);
+    // Mimikyu - Shadow Hit
+    map.insert(
+        "This attack also does 20 damage to 1 of your Pokémon.",
+        Mechanic::AlsoChoiceOwnPokemonDamage { damage: 20 },
+    );
     map.insert(
         "This attack also does 20 damage to 1 of your opponent's Benched Pokémon.",
         Mechanic::AlsoChoiceBenchDamage {
@@ -1673,7 +1690,15 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         },
     );
     // map.insert("This attack does 20 damage to each of your opponent's Pokémon.", todo_implementation);
-    // map.insert("This attack does 20 damage to each of your opponent's Pokémon. During your next turn, this Pokémon's Wild Spin attack does +20 damage to each of your opponent's Pokémon.", todo_implementation);
+    // Archeops - Wild Spin
+    map.insert(
+        "This attack does 20 damage to each of your opponent's Pokémon. During your next turn, this Pokémon's Wild Spin attack does +20 damage to each of your opponent's Pokémon.",
+        Mechanic::DamageAllOpponentPokemonEscalating {
+            attack_name: "Wild Spin".to_string(),
+            damage: 20,
+            increment: 20,
+        },
+    );
     map.insert(
         "This attack does 20 more damage for each type of Energy attached to this Pokémon.",
         Mechanic::ExtraDamagePerEnergyType {
@@ -1839,7 +1864,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             damage_per_energy: 40,
         },
     );
-    // map.insert("This attack does 40 more damage for each of your Benched Wishiwashi and Wishiwashi ex.", todo_implementation);
+    // Wishiwashi ex - School Storm
+    map.insert(
+        "This attack does 40 more damage for each of your Benched Wishiwashi and Wishiwashi ex.",
+        Mechanic::ExtraDamagePerPokemonWithNamesOnBench {
+            pokemon_names: vec!["Wishiwashi".to_string(), "Wishiwashi ex".to_string()],
+            damage_per: 40,
+        },
+    );
     map.insert(
         "This attack does 40 more damage for each of your opponent's Pokémon in play that has an Ability.",
         Mechanic::ExtraDamagePerOpponentPokemonWithAbility { damage_per: 40 },
@@ -1913,7 +1945,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         },
     );
     // map.insert("You can use this attack only if you have Uxie and Azelf on your Bench. Discard all Energy from this Pokémon.", todo_implementation);
-    // map.insert("You may discard any number of your Benched [W] Pokémon. This attack does 40 more damage for each Benched Pokémon you discarded in this way.", todo_implementation);
+    // Gyarados - Wild Swing
+    map.insert(
+        "You may discard any number of your Benched [W] Pokémon. This attack does 40 more damage for each Benched Pokémon you discarded in this way.",
+        Mechanic::OptionalDiscardBenchedTypeForExtraDamage {
+            energy_type: EnergyType::Water,
+            damage_per: 40,
+        },
+    );
     // map.insert("You may switch this Pokémon with 1 of your Benched Pokémon.", todo_implementation);
     map.insert(
         "Your opponent can't use any Supporter cards from their hand during their next turn.",
@@ -1922,13 +1961,26 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             duration: 1,
         },
     );
-    // map.insert("Your opponent reveals a random card from their hand and shuffles it into their deck.", todo_implementation);
-    // map.insert("Your opponent reveals their hand.", todo_implementation);
+    // Tsareena - Kick Down
+    map.insert(
+        "Your opponent reveals a random card from their hand and shuffles it into their deck.",
+        Mechanic::ShuffleRandomOpponentHandCardIntoDeck,
+    );
+    // Mew - Psy Report / Noctowl - Silent Wing. `State` is fully observable in this engine, so
+    // revealing a hand has no mechanical effect: the attack is just its damage.
+    map.insert(
+        "Your opponent reveals their hand.",
+        Mechanic::RevealOpponentHand,
+    );
     map.insert(
         "Your opponent reveals their hand. Choose a Supporter card you find there and discard it.",
         Mechanic::DarknessClaw,
     );
-    // map.insert("Your opponent reveals their hand. Choose a card you find there and shuffle it into your opponent's deck.", todo_implementation);
+    // Purugly - Interrupt
+    map.insert(
+        "Your opponent reveals their hand. Choose a card you find there and shuffle it into your opponent's deck.",
+        Mechanic::ChooseOpponentHandCardToShuffleIntoDeck,
+    );
     map.insert(
         "Your opponent's Active Pokémon is now Asleep.",
         Mechanic::InflictStatusConditions {
@@ -2226,7 +2278,11 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "This attack is used twice in a row. The second attack does 40 damage.(If the first attack Knocks Out your opponent's Active Pokémon, the second attack is used after your opponent chooses a new Active Pokémon.)",
         Mechanic::MegaKangaskhanExDoublePunchingFamily,
     );
-    // map.insert("This attack's damage isn't affected by Weakness or by any effects on your opponent's Active Pokémon.", todo_implementation);
+    // Ledian / Staryu / Starmie - Swift
+    map.insert(
+        "This attack's damage isn't affected by Weakness or by any effects on your opponent's Active Pokémon.",
+        Mechanic::DamageUnaffectedByWeaknessAndOpponentActiveEffects,
+    );
     map.insert(
         "Until this Pokémon leaves the Active Spot, this Pokémon's Heat-Up Crunch attack does +30 damage. This effect stacks.",
         Mechanic::DamageAndCardEffect {
@@ -2239,9 +2295,25 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             coin_flip: false,
         },
     );
-    // map.insert("You may shuffle this Pokémon and all attached cards into your deck.", todo_implementation);
-    // map.insert("Your opponent reveals a random card from their hand and shuffles it into their deck. Shuffle this Pokémon into your deck.", todo_implementation);
-    // map.insert("Your opponent's Active Pokémon is now Poisoned. During your opponent's next turn, that Pokémon can't retreat.", todo_implementation);
+    // Eldegoss - Float Up / Dunsparce - Bop 'n' Burrow
+    map.insert(
+        "You may shuffle this Pokémon and all attached cards into your deck.",
+        Mechanic::MayShuffleSelfIntoDeck,
+    );
+    // Liepard - Snatch and Flee
+    map.insert(
+        "Your opponent reveals a random card from their hand and shuffles it into their deck. Shuffle this Pokémon into your deck.",
+        Mechanic::ShuffleRandomOpponentHandCardIntoDeckAndSelfIntoDeck,
+    );
+    // Roserade - Poison Ring
+    map.insert(
+        "Your opponent's Active Pokémon is now Poisoned. During your opponent's next turn, that Pokémon can't retreat.",
+        Mechanic::InflictStatusConditionsAndCardEffect {
+            conditions: vec![StatusCondition::Poisoned],
+            effect: CardEffect::NoRetreat,
+            duration: 1,
+        },
+    );
 
     // New Mechanics from B2a
     map.insert(
@@ -2398,7 +2470,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             energies: vec![EnergyType::Water, EnergyType::Lightning],
         },
     );
-    // map.insert("This Pokémon also does 100 damage to itself and 50 damage to all Benched Pokémon (both yours and your opponent's).", todo_implementation);
+    // Forretress - Enormous Explosion
+    map.insert(
+        "This Pokémon also does 100 damage to itself and 50 damage to all Benched Pokémon (both yours and your opponent's).",
+        Mechanic::SelfDamageAndAllBenchDamage {
+            self_damage: 100,
+            bench_damage: 50,
+        },
+    );
     map.insert(
         "This attack does 20 more damage for each Benched Pokémon (both yours and your opponent's).",
         Mechanic::BenchCountDamage {
@@ -2732,6 +2811,28 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             damage_per: 40,
             energy_type: None,
             bench_side: BenchSide::OpponentBench,
+        },
+    );
+    // Sableye - Jeweled Gift
+    map.insert(
+        "Take a random Energy from among [G], [R], [W], [L], [P], [F], [D], and [M] Energy from your Energy Zone and attach it to 1 of your Benched Pokémon.",
+        Mechanic::AttachRandomBasicEnergyToBenched,
+    );
+    // Team Rocket's Magmar - Derisive Roasting
+    map.insert(
+        "This attack does 50 more damage for each Special Condition affecting your opponent's Active Pokémon.",
+        Mechanic::ExtraDamagePerOpponentSpecialCondition { damage_per: 50 },
+    );
+    // Teal Mask Ogerpon - Ogre's Whip
+    map.insert(
+        "This attack does damage to your opponent's Active Pokémon equal to this Pokémon's remaining HP.",
+        Mechanic::DamageEqualToSelfRemainingHp,
+    );
+    // Accelgor - Deck and Cover
+    map.insert(
+        "Your opponent's Active Pokémon is now Poisoned and Paralyzed. Shuffle this Pokémon and all attached cards into your deck.",
+        Mechanic::InflictStatusConditionsAndShuffleSelfIntoDeck {
+            conditions: vec![StatusCondition::Poisoned, StatusCondition::Paralyzed],
         },
     );
     map

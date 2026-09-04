@@ -295,6 +295,21 @@ impl PlayedCard {
         self.poisoned || self.paralyzed || self.asleep || self.burned || self.confused
     }
 
+    /// How many Special Conditions currently affect this Pokémon (e.g. for Team Rocket's Magmar's
+    /// Derisive Roasting, which scales with that count).
+    pub fn count_status_conditions(&self) -> usize {
+        [
+            self.poisoned,
+            self.paralyzed,
+            self.asleep,
+            self.burned,
+            self.confused,
+        ]
+        .iter()
+        .filter(|flag| **flag)
+        .count()
+    }
+
     pub(crate) fn has_tool_attached(&self) -> bool {
         self.attached_tool.is_some()
     }
