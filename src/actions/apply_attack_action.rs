@@ -1377,11 +1377,13 @@ fn milled_card_matches(
     false
 }
 
-/// Pachirisu's Crackling Snap / Dugtrio's Cliff Crumbler: the bonus depends on the (hidden) top
-/// card of the attacker's own deck, so it is forecast as one branch per possible outcome, with
-/// the probability of each read off the current deck. The deck is not shuffled by this attack,
-/// so the top card is already determined — but the search-based players must not be able to see
-/// it, hence the probabilistic split.
+/// Pachirisu's Crackling Snap / Dugtrio's Cliff Crumbler: mill the top card of the attacker's own
+/// deck; if it matches, the attack does `extra_damage` more.
+///
+/// The bonus is resolved deterministically off the current deck order, the same way
+/// `SimpleAction::DrawCard` is: the engine models the deck as an ordered, known list rather than
+/// as a distribution, so branching on a probability here would decorrelate the damage dealt from
+/// the card actually milled within a single game.
 fn discard_top_self_deck_extra_damage_if_match(
     state: &State,
     fixed_damage: u32,
@@ -1389,38 +1391,26 @@ fn discard_top_self_deck_extra_damage_if_match(
     energy_type: Option<EnergyType>,
     extra_damage: u32,
 ) -> AttackOutcomes {
-    let deck = &state.decks[state.current_player].cards;
-    let deck_size = deck.len();
-    if deck_size == 0 {
-        return active_damage_doutcome(fixed_damage);
-    }
+    let bonus = state.decks[state.current_player]
+        .cards
+        .first()
+        .is_some_and(|card| milled_card_matches(card, &trainer_type, energy_type));
 
-    let matching = deck
-        .iter()
-        .filter(|card| milled_card_matches(card, &trainer_type, energy_type))
-        .count();
-    let match_probability = matching as f64 / deck_size as f64;
-
-    let mill = move |_: &mut StdRng, state: &mut State, action: &Action| {
-        if let Some(card) = state.decks[action.actor].draw() {
-            state.discard_piles[action.actor].push(card);
-        }
+    let damage = if bonus {
+        fixed_damage + extra_damage
+    } else {
+        fixed_damage
     };
 
-    if matching == 0 {
-        return active_damage_effect_doutcome(fixed_damage, mill);
-    }
-    if matching == deck_size {
-        return active_damage_effect_doutcome(fixed_damage + extra_damage, mill);
-    }
-
-    AttackOutcomes::from_parts(
-        vec![match_probability, 1.0 - match_probability],
-        vec![
-            active_damage_effect_outcome(fixed_damage + extra_damage, mill),
-            active_damage_effect_outcome(fixed_damage, mill),
-        ],
-    )
+    // Mill before damage so the discard pile (which other cards count) is settled first.
+    AttackOutcomes::single(AttackOutcome::effect_then_damage(
+        |_, state, action| {
+            if let Some(card) = state.decks[action.actor].draw() {
+                state.discard_piles[action.actor].push(card);
+            }
+        },
+        vec![(damage, true, 0)],
+    ))
 }
 
 /// Slowking's Litter: the player chooses how many (0..=`max_cards`) Pokémon Tool cards to discard
