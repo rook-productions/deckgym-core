@@ -4,6 +4,7 @@ use crate::{
     actions::{ability_mechanic_from_effect, SimpleAction},
     hooks::is_ultra_beast,
     models::{EnergyType, PlayedCard},
+    move_generation::trainer_move_generation_implementation,
     State,
 };
 
@@ -177,6 +178,9 @@ fn can_use_ability_by_mechanic(
         }
         // Information-only; never offered (see `AbilityMechanic::LookAtCardsNoop`).
         AbilityMechanic::LookAtCardsNoop => false,
+        AbilityMechanic::UseRandomOpponentSupporterEffect => {
+            is_active && !card.ability_used && has_copyable_opponent_supporter(state)
+        }
         // Grafaiai's Poison Coating has no Active-Spot restriction.
         AbilityMechanic::CoinFlipPoisonOpponentActive => !card.ability_used,
         AbilityMechanic::CoinFlipSwitchOpponentBenchToActive => {
@@ -269,6 +273,21 @@ fn can_use_ability_by_mechanic(
         // coin-flip attack, never as a freely-selectable ability.
         AbilityMechanic::VictoryStarReflip | AbilityMechanic::LuxuryCoinReflip => false,
     }
+}
+
+/// Smeargle's Portrait is only worth offering when the opponent holds a Supporter whose effect
+/// this engine implements and that is playable right now.
+fn has_copyable_opponent_supporter(state: &State) -> bool {
+    let opponent = (state.current_player + 1) % 2;
+    state.hands[opponent].iter().any(|card| match card {
+        crate::models::Card::Trainer(trainer_card)
+            if trainer_card.trainer_card_type == crate::models::TrainerType::Supporter =>
+        {
+            trainer_move_generation_implementation(state, trainer_card)
+                .is_some_and(|actions| !actions.is_empty())
+        }
+        _ => false,
+    })
 }
 
 fn can_use_accept_pain(

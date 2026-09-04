@@ -7,8 +7,9 @@ use crate::{
     actions::{
         abilities::AbilityMechanic,
         apply_action_helpers::{
-            apply_activate, handle_damage, handle_knockouts, Mutation, Mutations,
+            apply_activate, handle_damage, handle_knockouts, Mutation, Mutations, Probabilities,
         },
+        apply_trainer_action::forecast_trainer_action,
         effect_ability_mechanic_map::ability_mechanic_from_effect,
         outcomes::Outcomes,
         shared_mutations::{pokemon_search_outcomes, tool_search_outcomes},
@@ -17,7 +18,8 @@ use crate::{
     combinatorics::generate_combinations,
     effects::{CardEffect, TurnEffect},
     hooks::is_ultra_beast,
-    models::{Card, EnergyType, PlayedCard, StatusCondition, TrainerType},
+    models::{Card, EnergyType, PlayedCard, StatusCondition, TrainerCard, TrainerType},
+    move_generation::trainer_move_generation_implementation,
     State,
 };
 
@@ -229,6 +231,9 @@ fn forecast_ability_by_mechanic(
             switch_out_opponent_active_to_bench()
         }
         AbilityMechanic::LookAtCardsNoop => Outcomes::single_fn(|_, _, _| {}),
+        AbilityMechanic::UseRandomOpponentSupporterEffect => {
+            use_random_opponent_supporter_effect(action.actor, state)
+        }
         AbilityMechanic::CoinFlipPoisonOpponentActive => coin_flip_poison_opponent_active(),
         AbilityMechanic::CoinFlipSwitchOpponentBenchToActive => {
             coin_flip_switch_opponent_bench_to_active()
@@ -832,6 +837,53 @@ fn prevent_all_damage_and_effects_on_self(in_play_idx: usize) -> Outcomes {
             pokemon.add_effect(CardEffect::PreventAllDamageAndEffects, 1);
         }
     })
+}
+
+/// Smeargle's Portrait: pick a Supporter uniformly at random from the opponent's hand and resolve
+/// its effect as this Ability's effect. Each candidate's own outcome distribution is folded into
+/// one flat distribution, scaled by the 1/n chance of drawing that card, so the forecast shows the
+/// full randomness. The opponent keeps the card.
+fn use_random_opponent_supporter_effect(actor: usize, state: &State) -> Outcomes {
+    let candidates = copyable_opponent_supporters(actor, state);
+    if candidates.is_empty() {
+        return Outcomes::single_fn(|_, _, _| {});
+    }
+
+    let pick_probability = 1.0 / candidates.len() as f64;
+    let mut probabilities: Probabilities = vec![];
+    let mut mutations: Mutations = vec![];
+    for supporter in candidates {
+        let (branch_probabilities, branch_mutations) =
+            forecast_trainer_action(actor, state, &supporter).into_branches();
+        for (probability, mutation) in branch_probabilities.into_iter().zip(branch_mutations) {
+            probabilities.push(probability * pick_probability);
+            mutations.push(mutation);
+        }
+    }
+    Outcomes::from_parts(probabilities, mutations)
+}
+
+/// Supporters in `actor`'s opponent's hand whose effect this engine can actually resolve right
+/// now: implemented (`trainer_move_generation_implementation` returns `Some`) and currently
+/// playable (it returns a non-empty action list). Duplicated copies are kept so that holding two
+/// of the same Supporter doubles its chance of being picked.
+fn copyable_opponent_supporters(actor: usize, state: &State) -> Vec<TrainerCard> {
+    let opponent = (actor + 1) % 2;
+    state.hands[opponent]
+        .iter()
+        .filter_map(|card| match card {
+            Card::Trainer(trainer_card)
+                if trainer_card.trainer_card_type == TrainerType::Supporter =>
+            {
+                Some(trainer_card.clone())
+            }
+            _ => None,
+        })
+        .filter(|trainer_card| {
+            trainer_move_generation_implementation(state, trainer_card)
+                .is_some_and(|actions| !actions.is_empty())
+        })
+        .collect()
 }
 
 fn coin_flip_poison_opponent_active() -> Outcomes {

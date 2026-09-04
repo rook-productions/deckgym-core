@@ -471,6 +471,14 @@ pub enum AbilityMechanic {
     /// generation, only pushed onto the move-generation stack by `apply_action` immediately
     /// after an eligible [R] attack's coins are flipped. See `PendingCoinReflip`.
     VictoryStarReflip,
+    /// Smeargle's Portrait: "Once during your turn, if this Pokémon is in the Active Spot, you may
+    /// look at a random Supporter card from your opponent's hand. Use the effect of that card as
+    /// the effect of this Ability."
+    ///
+    /// The opponent keeps the card (it is only copied), so nothing is removed from their hand.
+    /// Only Supporters that deckgym implements *and* that are currently playable are eligible —
+    /// copying an unplayable effect has no defined behavior in the engine.
+    UseRandomOpponentSupporterEffect,
     /// Gholdengo's Luxury Coin: "Once during your turn, when you flip any coins for an effect of
     /// your Trainer cards, you may ignore all results of those coin flips and begin flipping those
     /// coins again. You can't use more than 1 Luxury Coin Ability each turn."
