@@ -4,6 +4,8 @@ mod ability_effects_test;
 mod attack_effects_test;
 #[path = "mechanics/basic_knockout_happy_paths_test.rs"]
 mod basic_knockout_happy_paths_test;
+#[path = "mechanics/board_damage_ability_test.rs"]
+mod board_damage_ability_test;
 #[path = "mechanics/confusion_test.rs"]
 mod confusion_test;
 #[path = "mechanics/end_of_turn_knockout_ordering_test.rs"]

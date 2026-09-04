@@ -106,6 +106,39 @@ pub enum AbilityMechanic {
     ReduceOpponentActiveDamage {
         amount: u32,
     },
+    /// Eiscue's Ice Face: "If this Pokémon has full HP, it takes `amount` less damage from attacks
+    /// from your opponent's Pokémon." Depends on the current damage counters, so it's resolved in
+    /// `hooks::modify_damage` rather than being a plain `CardEffect`.
+    ReduceDamageFromAttacksIfFullHp {
+        amount: u32,
+    },
+    /// Falinks's Coordinated Unit: "If you have another <same name> in play, this Pokémon's
+    /// attacks do +`damage_bonus` damage to your opponent's Active Pokémon, and this Pokémon
+    /// takes -`damage_reduction` damage from attacks from your opponent's Pokémon."
+    /// Board-dependent on both sides, so it's resolved in `hooks::modify_damage`.
+    BuffIfAnotherSameNameInPlay {
+        damage_bonus: u32,
+        damage_reduction: u32,
+    },
+    /// Unown GUARD: "This Ability works if you have any Unown in play with an Ability other than
+    /// GUARD. All of your Pokémon take -`amount` damage from attacks from your opponent's
+    /// Pokémon." An aura over the owner's whole board; resolved in `hooks::modify_damage`.
+    ReduceDamageToAllYourPokemonWithOtherUnown {
+        amount: u32,
+    },
+    /// Unown POWER: "This Ability works if you have any Unown in play with an Ability other than
+    /// POWER. Attacks used by your Pokémon do +`amount` damage to your opponent's Active
+    /// Pokémon." Resolved in `hooks::modify_damage`.
+    IncreaseDamageOfYourPokemonWithOtherUnown {
+        amount: u32,
+    },
+    /// Politoed's Lordly Cheering: "As long as this Pokémon is on your Bench, attacks used by your
+    /// Pokémon that evolve from `evolves_from` do +`amount` damage to your opponent's Active
+    /// Pokémon." Resolved in `hooks::modify_damage`.
+    IncreaseDamageForEvolvesFromWhileBenched {
+        evolves_from: String,
+        amount: u32,
+    },
     IncreaseDamageWhenRemainingHpAtMost {
         amount: u32,
         hp_threshold: u32,

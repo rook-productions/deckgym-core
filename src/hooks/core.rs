@@ -730,7 +730,71 @@ fn get_ability_damage_reduction(
         _ => 0,
     };
 
-    effect_reduction + arceus_reduction + attacker_type_reduction
+    // Eiscue's Ice Face: only while the defender is at full HP.
+    let full_hp_reduction = match get_ability_mechanic(&receiving_pokemon.card) {
+        Some(AbilityMechanic::ReduceDamageFromAttacksIfFullHp { amount })
+            if receiving_pokemon.get_damage_counters() == 0 =>
+        {
+            debug!("Ice Face: Reducing damage by {}", amount);
+            *amount
+        }
+        _ => 0,
+    };
+
+    // Falinks's Coordinated Unit: only while another Pokémon with the same name is in play.
+    let same_name_reduction = match get_ability_mechanic(&receiving_pokemon.card) {
+        Some(AbilityMechanic::BuffIfAnotherSameNameInPlay {
+            damage_reduction, ..
+        }) if count_in_play_by_name(state, target_player, &receiving_pokemon.get_name()) > 1 => {
+            debug!("Coordinated Unit: Reducing damage by {}", damage_reduction);
+            *damage_reduction
+        }
+        _ => 0,
+    };
+
+    // Unown GUARD: an aura over all of the owner's Pokémon, active only while they also have an
+    // Unown in play with a different Ability.
+    let unown_guard_reduction: u32 = state
+        .enumerate_in_play_pokemon(target_player)
+        .filter_map(|(_, pokemon)| match get_ability_mechanic(&pokemon.card) {
+            Some(AbilityMechanic::ReduceDamageToAllYourPokemonWithOtherUnown { amount })
+                if has_other_unown_ability(state, target_player, &pokemon.card) =>
+            {
+                Some(*amount)
+            }
+            _ => None,
+        })
+        .sum();
+
+    effect_reduction
+        + arceus_reduction
+        + attacker_type_reduction
+        + full_hp_reduction
+        + same_name_reduction
+        + unown_guard_reduction
+}
+
+/// How many of `player`'s in-play Pokémon share `name`.
+fn count_in_play_by_name(state: &State, player: usize, name: &str) -> usize {
+    state
+        .enumerate_in_play_pokemon(player)
+        .filter(|(_, pokemon)| pokemon.get_name() == name)
+        .count()
+}
+
+/// Unown GUARD/POWER: "This Ability works if you have any Unown in play with an Ability other than
+/// GUARD/POWER." True when `player` has an Unown in play whose ability differs from `card`'s.
+fn has_other_unown_ability(state: &State, player: usize, card: &Card) -> bool {
+    let own_ability = card.get_ability().map(|ability| ability.title.clone());
+    state
+        .enumerate_in_play_pokemon(player)
+        .any(|(_, pokemon)| match &pokemon.card {
+            Card::Pokemon(other) if other.name == "Unown" => other
+                .ability
+                .as_ref()
+                .is_some_and(|ability| Some(&ability.title) != own_ability.as_ref()),
+            _ => false,
+        })
 }
 
 /// Whether `player` has Arceus or Arceus ex in play (Active or Benched).
@@ -781,7 +845,46 @@ fn get_ability_damage_increase(
         }
     }
 
+    // Falinks's Coordinated Unit: +damage while another Falinks is in play.
+    if let Some(AbilityMechanic::BuffIfAnotherSameNameInPlay { damage_bonus, .. }) =
+        ability_mechanic_from_effect(&ability.effect)
+    {
+        if count_in_play_by_name(state, attacking_player, &attacking_pokemon.get_name()) > 1 {
+            debug!("Coordinated Unit: Increasing damage by {}", damage_bonus);
+            return *damage_bonus;
+        }
+    }
+
     0
+}
+
+/// Board-wide damage bonuses granted to the attacker by *other* Pokémon its owner has in play:
+/// Unown POWER (any Unown in play with a different Ability) and Politoed's Lordly Cheering
+/// (attacks used by your Pokémon that evolve from Poliwhirl). Only applies active-to-active.
+fn get_board_ability_damage_increase(
+    state: &State,
+    attacking_player: usize,
+    attacking_pokemon: &PlayedCard,
+    is_active_to_active: bool,
+) -> u32 {
+    if !is_active_to_active {
+        return 0;
+    }
+    state
+        .enumerate_in_play_pokemon(attacking_player)
+        .filter_map(|(idx, pokemon)| match get_ability_mechanic(&pokemon.card) {
+            Some(AbilityMechanic::IncreaseDamageOfYourPokemonWithOtherUnown { amount })
+                if has_other_unown_ability(state, attacking_player, &pokemon.card) =>
+            {
+                Some(*amount)
+            }
+            Some(AbilityMechanic::IncreaseDamageForEvolvesFromWhileBenched {
+                evolves_from,
+                amount,
+            }) if idx != 0 && attacking_pokemon.evolved_from(evolves_from) => Some(*amount),
+            _ => None,
+        })
+        .sum()
 }
 
 fn get_increased_turn_effect_modifiers(
@@ -1199,6 +1302,11 @@ pub(crate) fn modify_damage(
         )
     };
     let ability_damage_increase = get_ability_damage_increase(
+        state,
+        attacking_player,
+        attacking_pokemon,
+        is_active_to_active,
+    ) + get_board_ability_damage_increase(
         state,
         attacking_player,
         attacking_pokemon,

@@ -44,7 +44,13 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "As long as this Pokémon is in the Active Spot, your opponent can't play any Stadium cards from their hand.",
             AbilityMechanic::NoOpponentStadiumInActive,
         );
-        // map.insert("As long as this Pokémon is on your Bench, attacks used by your Pokémon that evolve from Poliwhirl do +40 damage to your opponent's Active Pokémon.", todo_implementation);
+        map.insert(
+            "As long as this Pokémon is on your Bench, attacks used by your Pokémon that evolve from Poliwhirl do +40 damage to your opponent's Active Pokémon.",
+            AbilityMechanic::IncreaseDamageForEvolvesFromWhileBenched {
+                evolves_from: "Poliwhirl".to_string(),
+                amount: 40,
+            },
+        );
         map.insert(
             "As long as this Pokémon is on your Bench, prevent all damage done to this Pokémon by attacks.",
             AbilityMechanic::PreventDamageWhileBenched,
@@ -143,7 +149,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "If this Pokémon has any Energy attached, it has no Retreat Cost.",
             AbilityMechanic::NoRetreatIfHasEnergy,
         );
-        // map.insert("If this Pokémon has full HP, it takes -40 damage from attacks from your opponent's Pokémon.", todo_implementation);
+        map.insert(
+            "If this Pokémon has full HP, it takes -40 damage from attacks from your opponent's Pokémon.",
+            AbilityMechanic::ReduceDamageFromAttacksIfFullHp { amount: 40 },
+        );
         map.insert(
             "If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, do 10 damage to each of your opponent's Pokémon.",
             AbilityMechanic::DamageEachOpponentPokemonOnKnockout { amount: 10 },
@@ -208,7 +217,13 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
                 names: vec!["Latias".to_string()],
             },
         );
-        // map.insert("If you have another Falinks in play, this Pokémon's attacks do +20 damage to your opponent's Active Pokémon, and this Pokémon takes -20 damage from attacks from your opponent's Pokémon.", todo_implementation);
+        map.insert(
+            "If you have another Falinks in play, this Pokémon's attacks do +20 damage to your opponent's Active Pokémon, and this Pokémon takes -20 damage from attacks from your opponent's Pokémon.",
+            AbilityMechanic::BuffIfAnotherSameNameInPlay {
+                damage_bonus: 20,
+                damage_reduction: 20,
+            },
+        );
         map.insert(
             "If your opponent's Pokémon is Knocked Out by damage from this Pokémon's attacks, during your opponent's next turn, prevent all damage from—and effects of—attacks done to this Pokémon.",
             AbilityMechanic::ProtectSelfNextTurnAfterAttackKnockout,
@@ -422,8 +437,14 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             AbilityMechanic::PreventAllDamageFromEx,
         );
         // map.insert("Prevent all effects of attacks used by your opponent's Pokémon done to this Pokémon.", todo_implementation);
-        // map.insert("This Ability works if you have any Unown in play with an Ability other than GUARD. All of your Pokémon take -10 damage from attacks from your opponent's Pokémon.", todo_implementation);
-        // map.insert("This Ability works if you have any Unown in play with an Ability other than POWER. Attacks used by your Pokémon do +10 damage to your opponent's Active Pokémon.", todo_implementation);
+        map.insert(
+            "This Ability works if you have any Unown in play with an Ability other than GUARD. All of your Pokémon take -10 damage from attacks from your opponent's Pokémon.",
+            AbilityMechanic::ReduceDamageToAllYourPokemonWithOtherUnown { amount: 10 },
+        );
+        map.insert(
+            "This Ability works if you have any Unown in play with an Ability other than POWER. Attacks used by your Pokémon do +10 damage to your opponent's Active Pokémon.",
+            AbilityMechanic::IncreaseDamageOfYourPokemonWithOtherUnown { amount: 10 },
+        );
         map.insert(
             "This Pokémon can evolve into any Pokémon that evolves from Eevee if you play it from your hand onto this Pokémon. (This Pokémon can't evolve during your first turn or the turn you play it.)",
             AbilityMechanic::CanEvolveIntoEeveeEvolution,
@@ -451,12 +472,24 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "This Pokémon takes -10 damage from attacks.",
             AbilityMechanic::ReduceDamageFromAttacks { amount: 10 },
         );
-        // map.insert("This Pokémon takes -20 damage from attacks from [R] or [W] Pokémon.", todo_implementation);
+        map.insert(
+            "This Pokémon takes -20 damage from attacks from [R] or [W] Pokémon.",
+            AbilityMechanic::ReduceDamageFromAttacksByAttackerType {
+                amount: 20,
+                attacker_types: vec![EnergyType::Fire, EnergyType::Water],
+            },
+        );
         map.insert(
             "This Pokémon takes -20 damage from attacks.",
             AbilityMechanic::ReduceDamageFromAttacks { amount: 20 },
         );
-        // map.insert("This Pokémon takes -30 damage from attacks from [F] Pokémon.", todo_implementation);
+        map.insert(
+            "This Pokémon takes -30 damage from attacks from [F] Pokémon.",
+            AbilityMechanic::ReduceDamageFromAttacksByAttackerType {
+                amount: 30,
+                attacker_types: vec![EnergyType::Fighting],
+            },
+        );
         map.insert(
             "This Pokémon takes -30 damage from attacks from [R] or [W] Pokémon.",
             AbilityMechanic::ReduceDamageFromAttacksByAttackerType {
