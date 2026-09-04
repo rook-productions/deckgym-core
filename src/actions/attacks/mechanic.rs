@@ -622,9 +622,13 @@ pub enum Mechanic {
     InflictStatusIfStadiumInPlay {
         status: StatusCondition,
     },
+    /// Choose one of the source's attacks and use it as this attack. When `coin_flip` is true
+    /// the copy only happens on heads (e.g. Mimikyu's Try to Imitate, Clefairy's Mini-Metronome);
+    /// otherwise it always happens (e.g. Mew ex's Genome Hacking).
     CopyAttack {
         source: CopyAttackSource,
         require_attacker_energy_match: bool,
+        coin_flip: bool,
     },
     SelfAsleepAndHeal {
         amount: u32,
@@ -770,4 +774,28 @@ pub enum Mechanic {
     /// Flutter Mane - Hexing Flight: the attack does nothing unless this Pokémon moved from the
     /// Bench to the Active Spot this turn.
     DamageOnlyIfMovedFromBench,
+    /// Maushold - Family Beatdown: flip one coin for each of your in-play Pokémon whose name is
+    /// listed in `names`, dealing `damage_per_head` for each heads. Unlike
+    /// `CoinFlipPerPokemonInPlay`, only the named Pokémon are counted.
+    CoinFlipPerNamedPokemonInPlay {
+        names: Vec<String>,
+        damage_per_head: u32,
+    },
+    /// Guzzlord - Breakcore: flip a coin; on heads discard the opponent's Active Pokémon (with
+    /// its evolution chain and Tool). Discarding is not a Knock Out, so no point is scored.
+    CoinFlipDiscardOpponentActive,
+    /// Fan Rotom - Spin Storm: flip a coin; on heads put the opponent's Active Pokémon and the
+    /// cards under it into their hand. Attached Energy is discarded and any Tool goes to the
+    /// discard pile.
+    CoinFlipReturnOpponentActiveToHand,
+    /// Chinchou - Luring Glow: flip a coin; on heads the opponent switches 1 of their Benched
+    /// Pokémon into the Active Spot. The coin-flip counterpart of `KnockBackOpponentActive`.
+    CoinFlipKnockBackOpponentActive,
+    /// Origin Forme Dialga - Time Mash / Hippowdon - Crashing Fangs / Oinkologne - Leg Stomp:
+    /// deal the attack's fixed damage, then flip a coin; on TAILS leave `effect` on the
+    /// attacking Pokémon. The tails-side mirror of `DamageAndCardEffect`'s `coin_flip` branch.
+    CoinFlipTailsSelfCardEffect {
+        effect: CardEffect,
+        duration: u8,
+    },
 }

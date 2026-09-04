@@ -76,6 +76,7 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         Mechanic::CopyAttack {
             source: CopyAttackSource::OpponentActive,
             require_attacker_energy_match: false,
+            coin_flip: false,
         },
     );
     map.insert(
@@ -83,6 +84,7 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         Mechanic::CopyAttack {
             source: CopyAttackSource::OpponentInPlay,
             require_attacker_energy_match: true,
+            coin_flip: false,
         },
     );
     map.insert(
@@ -765,7 +767,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             damage_per_heads: 70,
         },
     );
-    // map.insert("Flip a coin. If heads, choose 1 of your opponent's Active Pokémon's attacks and use it as this attack.", todo_implementation);
+    map.insert(
+        "Flip a coin. If heads, choose 1 of your opponent's Active Pokémon's attacks and use it as this attack.",
+        Mechanic::CopyAttack {
+            source: CopyAttackSource::OpponentActive,
+            require_attacker_energy_match: false,
+            coin_flip: true,
+        },
+    );
     map.insert(
         "Flip a coin. If heads, discard a random Energy from your opponent's Active Pokémon.",
         Mechanic::CoinFlipDiscardEnergyFromOpponentActive,
@@ -790,8 +799,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         coin_flip: true,
     });
     // map.insert("Flip a coin. If heads, heal 60 damage from this Pokémon.", todo_implementation);
-    // map.insert("Flip a coin. If heads, put your opponent's Active Pokémon into their hand.", todo_implementation);
-    // map.insert("Flip a coin. If heads, switch in 1 of your opponent's Benched Pokémon to the Active Spot.", todo_implementation);
+    map.insert(
+        "Flip a coin. If heads, put your opponent's Active Pokémon into their hand.",
+        Mechanic::CoinFlipReturnOpponentActiveToHand,
+    );
+    map.insert(
+        "Flip a coin. If heads, switch in 1 of your opponent's Benched Pokémon to the Active Spot.",
+        Mechanic::CoinFlipKnockBackOpponentActive,
+    );
     map.insert(
         "Flip a coin. If heads, your opponent shuffles their Active Pokémon into their deck.",
         Mechanic::ShuffleOpponentActiveIntoDeck,
@@ -896,7 +911,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Flip a coin. If tails, discard 2 random Energy from this Pokémon.",
         Mechanic::CoinFlipSelfDiscardRandomEnergy { count: 2 },
     );
-    // map.insert("Flip a coin. If tails, during your next turn, this Pokémon can't attack.", todo_implementation);
+    map.insert(
+        "Flip a coin. If tails, during your next turn, this Pokémon can't attack.",
+        Mechanic::CoinFlipTailsSelfCardEffect {
+            effect: CardEffect::CannotAttack,
+            duration: 2,
+        },
+    );
     map.insert(
         "Flip a coin. If tails, this Pokémon also does 20 damage to itself.",
         Mechanic::CoinFlipSelfDamage { self_damage: 20 },
@@ -2050,6 +2071,7 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         Mechanic::CopyAttack {
             source: CopyAttackSource::OwnBenchNonEx,
             require_attacker_energy_match: true,
+            coin_flip: false,
         },
     );
     map.insert(
@@ -2103,8 +2125,17 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             num_coins: 3,
         },
     );
-    // map.insert("Flip a coin for each Tandemaus and Maushold you have in play. This attack does 60 damage for each heads.", todo_implementation);
-    // map.insert("Flip a coin. If heads, discard your opponent's Active Pokémon.", todo_implementation);
+    map.insert(
+        "Flip a coin for each Tandemaus and Maushold you have in play. This attack does 60 damage for each heads.",
+        Mechanic::CoinFlipPerNamedPokemonInPlay {
+            names: vec!["Tandemaus".to_string(), "Maushold".to_string()],
+            damage_per_head: 60,
+        },
+    );
+    map.insert(
+        "Flip a coin. If heads, discard your opponent's Active Pokémon.",
+        Mechanic::CoinFlipDiscardOpponentActive,
+    );
     map.insert(
         "Flip a coin. If heads, during your opponent's next turn, this Pokémon takes -100 damage from attacks.",
         Mechanic::DamageAndCardEffect {

@@ -935,7 +935,8 @@ fn forecast_effect_attack_by_mechanic(
         Mechanic::CopyAttack {
             source,
             require_attacker_energy_match,
-        } => copy_attack(state, source, *require_attacker_energy_match),
+            coin_flip,
+        } => copy_attack(state, source, *require_attacker_energy_match, *coin_flip),
         Mechanic::SelfAsleepAndHeal { amount } => {
             self_asleep_and_heal_attack(*amount, attack.fixed_damage)
         }
@@ -1063,7 +1064,110 @@ fn forecast_effect_attack_by_mechanic(
         Mechanic::DamageOnlyIfMovedFromBench => {
             damage_only_if_moved_from_bench(state, attack.fixed_damage)
         }
+        Mechanic::CoinFlipPerNamedPokemonInPlay {
+            names,
+            damage_per_head,
+        } => coin_flip_per_named_pokemon_in_play_attack(state, names, *damage_per_head),
+        Mechanic::CoinFlipDiscardOpponentActive => coin_flip_discard_opponent_active(),
+        Mechanic::CoinFlipReturnOpponentActiveToHand => coin_flip_return_opponent_active_to_hand(),
+        Mechanic::CoinFlipKnockBackOpponentActive => {
+            coin_flip_knock_back_opponent_active(attack.fixed_damage)
+        }
+        Mechanic::CoinFlipTailsSelfCardEffect { effect, duration } => {
+            coin_flip_tails_self_card_effect(attack.fixed_damage, effect.clone(), *duration)
+        }
     }
+}
+
+/// Maushold - Family Beatdown.
+fn coin_flip_per_named_pokemon_in_play_attack(
+    state: &State,
+    names: &[String],
+    damage_per_head: u32,
+) -> AttackOutcomes {
+    let num_coins = state
+        .enumerate_in_play_pokemon(state.current_player)
+        .filter(|(_, pokemon)| names.contains(&pokemon.get_name()))
+        .count();
+    AttackOutcomes::binomial_by_heads(num_coins, move |heads| {
+        active_damage_outcome(heads as u32 * damage_per_head)
+    })
+}
+
+/// Guzzlord - Breakcore. Discarding the Defending Pokémon is not a Knock Out, so it awards no
+/// point; the opponent simply has to promote a replacement.
+fn coin_flip_discard_opponent_active() -> AttackOutcomes {
+    AttackOutcomes::binary_coin(
+        active_damage_effect_outcome(0, move |_, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            state.discard_from_play(opponent, 0);
+            state.trigger_promotion_or_declare_winner(opponent);
+        }),
+        active_damage_outcome(0),
+    )
+}
+
+/// Fan Rotom - Spin Storm. The Pokémon and the cards under it go back to their owner's hand;
+/// attached Energy is discarded and any attached Tool goes to the discard pile.
+fn coin_flip_return_opponent_active_to_hand() -> AttackOutcomes {
+    AttackOutcomes::binary_coin(
+        active_damage_effect_outcome(0, move |_, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            let active = state.in_play_pokemon[opponent][0]
+                .take()
+                .expect("Active Pokemon should be there");
+
+            let mut cards_to_hand = active.cards_behind.clone();
+            cards_to_hand.push(active.card.clone());
+            state.hands[opponent].extend(cards_to_hand);
+
+            if let Some(tool_card) = active.attached_tool.clone() {
+                state.discard_piles[opponent].push(tool_card);
+            }
+            state.discard_energies[opponent].extend(active.attached_energy.iter().cloned());
+
+            state.refresh_double_grass_bonus_for_player(opponent);
+            state.trigger_promotion_or_declare_winner(opponent);
+        }),
+        active_damage_outcome(0),
+    )
+}
+
+/// Chinchou - Luring Glow.
+fn coin_flip_knock_back_opponent_active(damage: u32) -> AttackOutcomes {
+    AttackOutcomes::binary_coin(
+        active_damage_effect_outcome(damage, move |_, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            let choices: Vec<SimpleAction> = state
+                .enumerate_bench_pokemon(opponent)
+                .map(|(in_play_idx, _)| SimpleAction::Activate {
+                    player: opponent,
+                    in_play_idx,
+                })
+                .collect();
+            if choices.is_empty() {
+                return; // No benched pokemon to switch in
+            }
+            state.move_generation_stack.push((opponent, choices));
+        }),
+        active_damage_outcome(damage),
+    )
+}
+
+/// Origin Forme Dialga - Time Mash / Hippowdon - Crashing Fangs / Oinkologne - Leg Stomp.
+fn coin_flip_tails_self_card_effect(
+    damage: u32,
+    effect: CardEffect,
+    duration: u8,
+) -> AttackOutcomes {
+    AttackOutcomes::binary_coin(
+        active_damage_outcome(damage),
+        active_damage_effect_outcome(damage, move |_, state, action| {
+            state
+                .get_active_mut(action.actor)
+                .add_effect(effect.clone(), duration);
+        }),
+    )
 }
 
 /// Number of Energy attached to `player`'s Active Pokémon.
@@ -1172,15 +1276,25 @@ fn copy_attack(
     _state: &State,
     source: &CopyAttackSource,
     require_attacker_energy_match: bool,
+    coin_flip: bool,
 ) -> AttackOutcomes {
     let source = source.clone();
-    active_damage_effect_doutcome(0, move |_, state, action| {
+    let offer_copies = move |_: &mut StdRng, state: &mut State, action: &Action| {
         let choices =
             copied_attack_choices(state, action.actor, &source, require_attacker_energy_match);
         if !choices.is_empty() {
             state.move_generation_stack.push((action.actor, choices));
         }
-    })
+    };
+    if coin_flip {
+        // Mimikyu's Try to Imitate / Clefairy's Mini-Metronome: on tails nothing happens at all.
+        AttackOutcomes::binary_coin(
+            active_damage_effect_outcome(0, offer_copies),
+            AttackOutcome::noop(),
+        )
+    } else {
+        active_damage_effect_doutcome(0, offer_copies)
+    }
 }
 
 fn copied_attack_choices(

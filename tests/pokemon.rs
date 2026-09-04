@@ -60,6 +60,10 @@ mod charmeleon_ignition_test;
 mod coalossal_coal_drop_test;
 #[path = "pokemon/coalossal_mountain_crush_test.rs"]
 mod coalossal_mountain_crush_test;
+#[path = "pokemon/coin_flip_displacement_attacks_test.rs"]
+mod coin_flip_displacement_attacks_test;
+#[path = "pokemon/coin_flip_tails_cannot_attack_test.rs"]
+mod coin_flip_tails_cannot_attack_test;
 #[path = "pokemon/comfey_flower_shield_test.rs"]
 mod comfey_flower_shield_test;
 #[path = "pokemon/corviknight_line_test.rs"]
@@ -198,6 +202,8 @@ mod mamoswine_thick_fat_test;
 mod marshadow_revenge_test;
 #[path = "pokemon/maushold_b2a_test.rs"]
 mod maushold_b2a_test;
+#[path = "pokemon/maushold_family_beatdown_test.rs"]
+mod maushold_family_beatdown_test;
 #[path = "pokemon/mega_camerupt_ex_test.rs"]
 mod mega_camerupt_ex_test;
 #[path = "pokemon/mega_diancie_ex_test.rs"]
@@ -226,6 +232,8 @@ mod meowstic_test;
 mod meowth_carefree_steps_test;
 #[path = "pokemon/milotic_ex_aqua_charge_test.rs"]
 mod milotic_ex_aqua_charge_test;
+#[path = "pokemon/mimikyu_try_to_imitate_test.rs"]
+mod mimikyu_try_to_imitate_test;
 #[path = "pokemon/miraidon_ex_test.rs"]
 mod miraidon_ex_test;
 #[path = "pokemon/morpeko_test.rs"]
