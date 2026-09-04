@@ -214,6 +214,7 @@ fn can_use_ability_by_mechanic(
         AbilityMechanic::NoOpponentSupportInActive => false,
         AbilityMechanic::NoOpponentStadiumInActive => false, // Passive ability
         AbilityMechanic::DoubleGrassEnergy => false,
+        AbilityMechanic::GrantedTypes { .. } => false,
         AbilityMechanic::PreventOpponentActiveEvolution => false,
         AbilityMechanic::ReduceRetreatCostOfYourActiveBasicFromBench { .. } => false,
         AbilityMechanic::ReduceRetreatCostOfYourActiveTypedFromBench { .. } => false,

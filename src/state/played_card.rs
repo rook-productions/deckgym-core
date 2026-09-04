@@ -204,12 +204,75 @@ impl PlayedCard {
         self.damage_counters = self.damage_counters.saturating_add(damage);
     }
 
+    /// This Pokémon's **printed** (base) type, ignoring anything granted in play. Prefer
+    /// `is_type` / `get_energy_types` for rules questions — see the table on `get_energy_types`
+    /// for which checks are which.
     // Option because if playing an item card... (?)
     pub(crate) fn get_energy_type(&self) -> Option<EnergyType> {
         match &self.card {
             Card::Pokemon(pokemon_card) => Some(pokemon_card.energy_type),
             _ => None,
         }
+    }
+
+    /// Every Energy type this Pokémon counts as **while in play**: the printed type(s) of its
+    /// card (`Card::get_types`) plus any type granted by its Ability
+    /// (`AbilityMechanic::GrantedTypes`, i.e. Urshifu's Double Type). The list is deduplicated
+    /// and keeps the printed type first.
+    ///
+    /// The lookup goes through `ability_mechanic()`, so a Pokémon that has lost its Abilities
+    /// (Budew's Prickly Powder, Alolan Muk-style suppression) falls back to its printed type.
+    ///
+    /// # Which checks use the type *set* and which use the printed type
+    ///
+    /// Rule of thumb: a Pokémon **in play** is every one of its types at once, so any rule that
+    /// asks "is this a [X] Pokémon" is satisfied if *any* of its types is [X]. Cards that are
+    /// **not** in play (deck, hand, discard) have no Ability active, so they keep the printed
+    /// type. Bonuses granted this way are still applied **once**, never once per matching type.
+    ///
+    /// | Site | Rule chosen |
+    /// |---|---|
+    /// | Weakness (`hooks::core::get_weakness_application`) | Defender's Weakness vs the **attacker's type set**: weak to either type → the usual flat +20 (or Bounded Field ×2). Never doubled when more than one type is involved — Weakness names a single type, so at most one can match. |
+    /// | Typed damage auras (`IncreaseDamageForTypeInPlay`, `IncreaseDamageForTwoTypesInPlay`) | Attacker's type set. `…TwoTypes…` still adds its bonus once even if both listed types match. |
+    /// | `ReduceDamageFromAttacksByAttackerType` (Thick Fat) | Attacker's type set intersects the listed types. |
+    /// | `TurnEffect::IncreasedDamageForType{,AgainstEx}` | Attacker's type set. |
+    /// | `TurnEffect::ReducedDamageForType` | Defender's type set. |
+    /// | Arena of Antiquity ([F] attacker), Peculiar Plaza ([P] retreat) | In-play Pokémon's type set. |
+    /// | Typed retreat reductions (`ReduceRetreatCostOfYourActiveTypedFromBench`, Inflatable Boat) | Active's type set; each source still applies once. |
+    /// | Typed Tools on their holder (Leaf Cape, Steel Apron, Metal Core Barrier, Dark Pendant, Deceptive Needle, Electrical Cord) | Holder's type set — the Tool is attached to a Pokémon in play. |
+    /// | Typed HP auras (`IncreaseHpOfYourTypedPokemon`) | Recipient's type set. |
+    /// | Jungle Totem ([G] Energy doubling) | Holder's type set. |
+    /// | Typed Energy attach / move abilities and Trainers (Vaporeon, Lunala ex, Baxcalibur, Electric Generator, Misty, …) | Target's type set. |
+    /// | Typed heals and typed selection of Pokémon **in play** (Erika, Diantha, Ilima, Parasol Lady, Wallace, Quick Growth, `HealTypedPokemonOnEvolve`, …) | Target's type set. |
+    /// | `num_in_play_of_type` and every "count/choose your [X] Pokémon" attack | Type set of each in-play Pokémon; a dual-type Pokémon is still counted once per type asked about. |
+    /// | "If your opponent's Active is a [X] Pokémon" (`ExtraDamageIfDefenderType`, `…TypeIn`) | Defender's type set; the bonus applies once. |
+    /// | Victory Star (attacker must be [R]) | Attacker's type set. |
+    /// | KO bookkeeping for revenge attacks (`record_knocked_out_by_opponent_attack`) | Records **all** of the KO'd Pokémon's types, so a [D]-restricted revenge attack sees a KO'd [F]/[D] Pokémon. |
+    /// | Deck / hand / discard-pile searches and mills (`pokemon_search_outcomes_by_type`, Fishing Net, Fisher, Fragrant Forest, `milled_card_matches`, the deck side of Wallace and Quick Growth) | **Printed** type — the card is not in play, so its Ability is not active. |
+    /// | Deck building (`Deck::energy_types`), TUI colours, `card_enum_generator` | **Printed** type. |
+    pub fn get_energy_types(&self) -> Vec<EnergyType> {
+        let mut types = self.card.get_types();
+        if let Some(AbilityMechanic::GrantedTypes { energy_types }) = self.ability_mechanic() {
+            for granted in energy_types {
+                if !types.contains(granted) {
+                    types.push(*granted);
+                }
+            }
+        }
+        types
+    }
+
+    /// Whether this Pokémon counts as `energy_type` while in play — the membership test over
+    /// `get_energy_types`, without the allocation. This is what almost every "is this a [X]
+    /// Pokémon" rule should call.
+    pub fn is_type(&self, energy_type: EnergyType) -> bool {
+        if self.card.is_type(energy_type) {
+            return true;
+        }
+        matches!(
+            self.ability_mechanic(),
+            Some(AbilityMechanic::GrantedTypes { energy_types }) if energy_types.contains(&energy_type)
+        )
     }
 
     /// Check if this Pokemon evolved from a specific Pokemon name

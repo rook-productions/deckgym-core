@@ -229,9 +229,8 @@ impl State {
     /// Block (no Pokémon on either side can be healed).
     pub(crate) fn refresh_ability_board_bonuses(&mut self) {
         let heal_blocked = (0..2).any(|player| {
-            self.enumerate_in_play_pokemon(player).any(|(_, pokemon)| {
-                pokemon.has_ability(&AbilityMechanic::NoHealingForAnyone)
-            })
+            self.enumerate_in_play_pokemon(player)
+                .any(|(_, pokemon)| pokemon.has_ability(&AbilityMechanic::NoHealingForAnyone))
         });
         let typed_hp_bonuses: [Vec<(EnergyType, u32)>; 2] = [
             collect_typed_hp_bonuses(self, 0),
@@ -938,15 +937,13 @@ impl State {
 fn collect_typed_hp_bonuses(state: &State, player: usize) -> Vec<(EnergyType, u32)> {
     state
         .enumerate_in_play_pokemon(player)
-        .filter_map(
-            |(_, pokemon)| match pokemon.ability_mechanic() {
-                Some(AbilityMechanic::IncreaseHpOfYourTypedPokemon {
-                    energy_type,
-                    amount,
-                }) => Some((*energy_type, *amount)),
-                _ => None,
-            },
-        )
+        .filter_map(|(_, pokemon)| match pokemon.ability_mechanic() {
+            Some(AbilityMechanic::IncreaseHpOfYourTypedPokemon {
+                energy_type,
+                amount,
+            }) => Some((*energy_type, *amount)),
+            _ => None,
+        })
         .collect()
 }
 

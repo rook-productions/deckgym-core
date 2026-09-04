@@ -293,6 +293,17 @@ pub enum AbilityMechanic {
     /// Snorlax's Massive Body: as long as this Pokémon is in the Active Spot, the opponent
     /// can't play any Stadium cards from their hand.
     NoOpponentStadiumInActive,
+    /// Urshifu's Double Type: "As long as this Pokémon is in play, it is [X] and [Y] type."
+    ///
+    /// Passive. The granted types are unioned with the card's printed type by
+    /// `PlayedCard::get_energy_types` / `PlayedCard::is_type`, which is what every in-play "is
+    /// this a [X] Pokémon" rule consults — so Weakness, typed auras, typed Energy attachment,
+    /// typed Tools and so on all see both types at once. Because the lookup goes through the
+    /// board-aware `PlayedCard::ability_mechanic`, suppressing the Ability reverts the Pokémon
+    /// to its printed type.
+    GrantedTypes {
+        energy_types: Vec<EnergyType>,
+    },
     DoubleGrassEnergy,
     PreventOpponentActiveEvolution,
     ReduceRetreatCostOfYourActiveBasicFromBench {
