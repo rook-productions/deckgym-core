@@ -61,6 +61,13 @@ pub struct PlayedCard {
     /// since the card leaves play) by `handle_knockouts`.
     #[serde(default)]
     pub(crate) knockout_points_denied: bool,
+    /// Whether this Pokémon has been damaged by an attack while in the Active Spot during the
+    /// current turn, and during the previous turn (e.g. for Wobbuffet's Reply Strongly). Rolled
+    /// over by `end_turn_maintenance`, and carried with the card if it retreats.
+    #[serde(default)]
+    damaged_by_attack_while_active_this_turn: bool,
+    #[serde(default)]
+    damaged_by_attack_while_active_last_turn: bool,
 
     /// Effects that should be cleared if moved to the bench (by retreat or similar).
     /// The second value is the number of turns left for the effect.
@@ -100,6 +107,8 @@ impl PlayedCard {
             prevent_first_attack_damage_used: false,
             has_attacked_since_play: false,
             knockout_points_denied: false,
+            damaged_by_attack_while_active_this_turn: false,
+            damaged_by_attack_while_active_last_turn: false,
         }
     }
 
@@ -382,6 +391,22 @@ impl PlayedCard {
         self.effects.push((effect, duration));
     }
 
+    /// Records that this Pokémon was damaged by an attack while in the Active Spot this turn.
+    pub(crate) fn mark_damaged_by_attack_while_active(&mut self) {
+        self.damaged_by_attack_while_active_this_turn = true;
+    }
+
+    /// Whether this Pokémon was damaged by an attack during the previous turn while it was in
+    /// the Active Spot (e.g. for Wobbuffet's Reply Strongly).
+    pub fn was_damaged_by_attack_while_active_last_turn(&self) -> bool {
+        self.damaged_by_attack_while_active_last_turn
+    }
+
+    /// Whether this Pokémon currently carries `effect`, regardless of its remaining duration.
+    pub fn has_effect(&self, effect: &CardEffect) -> bool {
+        self.effects.iter().any(|(stored, _)| stored == effect)
+    }
+
     pub(crate) fn get_active_effects(&self) -> Vec<CardEffect> {
         self.effects
             .iter()
@@ -503,6 +528,9 @@ impl PlayedCard {
         // A points-denial coin flip that didn't end up mattering (the Knock Out was prevented)
         // must not carry over to a later Knock Out.
         self.knockout_points_denied = false;
+        // Roll the "damaged by an attack while Active" flag over to the previous turn.
+        self.damaged_by_attack_while_active_last_turn =
+            std::mem::take(&mut self.damaged_by_attack_while_active_this_turn);
 
         // Reset played_this_turn, moved_to_active_this_turn, and ability_used
         self.played_this_turn = false;

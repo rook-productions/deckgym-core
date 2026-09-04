@@ -23,7 +23,7 @@ use crate::{
     effects::{CardEffect, TurnEffect},
     hooks::{
         attack_effect_ignores_opponent_active_effects, can_evolve_into, contains_energy,
-        get_attack_cost, get_extra_random_spread_hits, get_retreat_cost, get_stage,
+        get_effective_attack_cost, get_extra_random_spread_hits, get_retreat_cost, get_stage,
     },
     models::{Attack, Card, EnergyType, StatusCondition, TrainerType},
     tools::has_tool,
@@ -295,9 +295,10 @@ fn forecast_effect_attack_by_mechanic(
         Mechanic::HealOneYourBenchedPokemon { amount } => {
             heal_one_your_benched_pokemon_attack(*amount)
         }
-        Mechanic::HealAllYourPokemon { amount } => {
-            heal_all_your_pokemon_attack(attack.fixed_damage, *amount)
-        }
+        Mechanic::HealAllYourPokemon {
+            amount,
+            energy_type,
+        } => heal_all_your_pokemon_attack(attack.fixed_damage, *amount, *energy_type),
         Mechanic::HealAllBenchedPokemon { amount, only_basic } => {
             heal_all_benched_pokemon_attack(attack.fixed_damage, *amount, *only_basic)
         }
@@ -800,11 +801,13 @@ fn forecast_effect_attack_by_mechanic(
         Mechanic::ExtraDamageIfKnockedOutLastTurn {
             energy_type,
             extra_damage,
+            status,
         } => extra_damage_if_knocked_out_last_turn_attack(
             state,
             attack.fixed_damage,
             *energy_type,
             *extra_damage,
+            *status,
         ),
         Mechanic::ExtraDamageIfAttackUsedDuringOwnLastTurn {
             attack_name,
@@ -986,7 +989,8 @@ fn forecast_effect_attack_by_mechanic(
         Mechanic::CopyAttack {
             source,
             require_attacker_energy_match,
-        } => copy_attack(state, source, *require_attacker_energy_match),
+            coin_flip,
+        } => copy_attack(state, source, *require_attacker_energy_match, *coin_flip),
         Mechanic::SelfAsleepAndHeal { amount } => {
             self_asleep_and_heal_attack(*amount, attack.fixed_damage)
         }
@@ -1173,6 +1177,79 @@ fn forecast_effect_attack_by_mechanic(
             damage_and_discard_all_energy(attack.fixed_damage)
         }
         Mechanic::MoveOwnEnergyAnyWay => move_own_energy_any_way(attack.fixed_damage),
+        Mechanic::ExtraDamageIfSameEnergyCountAsOpponent { extra_damage } => {
+            extra_damage_if_same_energy_count_as_opponent(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfSharedEnergyTypeWithOpponent { extra_damage } => {
+            extra_damage_if_shared_energy_type_with_opponent(
+                state,
+                attack.fixed_damage,
+                *extra_damage,
+            )
+        }
+        Mechanic::ExtraDamageIfMoreEnergyThanOpponent { extra_damage } => {
+            extra_damage_if_more_energy_than_opponent(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfHandSizeIn {
+            hand_sizes,
+            extra_damage,
+        } => extra_damage_if_hand_size_in(state, attack.fixed_damage, hand_sizes, *extra_damage),
+        Mechanic::ExtraDamageIfSameHandSizeAsOpponent { extra_damage } => {
+            extra_damage_if_same_hand_size_as_opponent(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfFewerPokemonInPlay { extra_damage } => {
+            extra_damage_if_fewer_pokemon_in_play(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfNoPoints { extra_damage } => {
+            extra_damage_if_no_points(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::NoDamageIfSelfHpAtMost { threshold } => {
+            no_damage_if_self_hp_at_most(state, attack.fixed_damage, *threshold)
+        }
+        Mechanic::DamageOnlyIfMovedFromBench => {
+            damage_only_if_moved_from_bench(state, attack.fixed_damage)
+        }
+        Mechanic::CoinFlipPerNamedPokemonInPlay {
+            names,
+            damage_per_head,
+        } => coin_flip_per_named_pokemon_in_play_attack(state, names, *damage_per_head),
+        Mechanic::CoinFlipDiscardOpponentActive => coin_flip_discard_opponent_active(),
+        Mechanic::CoinFlipReturnOpponentActiveToHand => coin_flip_return_opponent_active_to_hand(),
+        Mechanic::CoinFlipKnockBackOpponentActive => {
+            coin_flip_knock_back_opponent_active(attack.fixed_damage)
+        }
+        Mechanic::CoinFlipTailsSelfCardEffect { effect, duration } => {
+            coin_flip_tails_self_card_effect(attack.fixed_damage, effect.clone(), *duration)
+        }
+        Mechanic::AlsoBenchDamageIfPokemonOnBench {
+            pokemon_name,
+            bench_damage,
+        } => also_bench_damage_if_pokemon_on_bench(
+            state,
+            attack.fixed_damage,
+            pokemon_name,
+            *bench_damage,
+        ),
+        Mechanic::DiscardOpponentEnergyIfEvolvedFromThisTurn {
+            pokemon_name,
+            count,
+        } => discard_opponent_energy_if_evolved_from_this_turn(
+            state,
+            attack.fixed_damage,
+            pokemon_name,
+            *count,
+        ),
+        // The cost substitution happens in `hooks::get_effective_attack_cost`; the attack itself
+        // is plain fixed damage.
+        Mechanic::AlternateAttackCost { .. } => active_damage_doutcome(attack.fixed_damage),
+        Mechanic::ExtraDamageIfDamagedWhileActiveLastTurn { extra_damage } => {
+            extra_damage_if_damaged_while_active_last_turn(
+                state,
+                attack.fixed_damage,
+                *extra_damage,
+            )
+        }
+        Mechanic::HalveOpponentActiveHp => halve_opponent_active_hp(),
     }
 }
 
@@ -1567,19 +1644,299 @@ fn optional_discard_benched_type_for_extra_damage(
     })
 }
 
+/// Whether the attacking Pokémon evolved from a Pokémon named `pokemon_name` during this turn.
+/// Checks the card directly underneath, so evolving via Rare Candy (which skips the named
+/// Stage 1) does not qualify.
+fn evolved_from_named_this_turn(state: &State, pokemon_name: &str) -> bool {
+    state.in_play_pokemon[state.current_player][0]
+        .as_ref()
+        .is_some_and(|active| {
+            active.played_this_turn
+                && active
+                    .cards_behind
+                    .last()
+                    .is_some_and(|under| under.get_name() == pokemon_name)
+        })
+}
+
+/// Minun - Buddy Spark / Magmortar - Thundering Volcano.
+fn also_bench_damage_if_pokemon_on_bench(
+    state: &State,
+    active_damage: u32,
+    pokemon_name: &str,
+    bench_damage: u32,
+) -> AttackOutcomes {
+    let has_partner = state
+        .enumerate_bench_pokemon(state.current_player)
+        .any(|(_, pokemon)| pokemon.get_name() == pokemon_name);
+    if !has_partner {
+        return active_damage_doutcome(active_damage);
+    }
+    let opponent = (state.current_player + 1) % 2;
+    let mut targets: Vec<DamageTarget> = state
+        .enumerate_bench_pokemon(opponent)
+        .map(|(idx, _)| (bench_damage, true, idx))
+        .collect();
+    targets.push((active_damage, true, 0));
+    damage_effect_doutcome(targets, |_, _, _| {})
+}
+
+/// Dudunsparce - Sudden Drilling.
+fn discard_opponent_energy_if_evolved_from_this_turn(
+    state: &State,
+    damage: u32,
+    pokemon_name: &str,
+    count: usize,
+) -> AttackOutcomes {
+    if !evolved_from_named_this_turn(state, pokemon_name) {
+        return active_damage_doutcome(damage);
+    }
+    active_damage_effect_doutcome(damage, move |rng, state, action| {
+        discard_random_energy_from_opponent_active(rng, state, action.actor, count);
+    })
+}
+
+/// Wobbuffet - Reply Strongly.
+fn extra_damage_if_damaged_while_active_last_turn(
+    state: &State,
+    base: u32,
+    extra: u32,
+) -> AttackOutcomes {
+    let was_damaged = state
+        .get_active(state.current_player)
+        .was_damaged_by_attack_while_active_last_turn();
+    active_damage_doutcome(if was_damaged { base + extra } else { base })
+}
+
+/// Bidoof - Super Fang. Pocket keeps HP in multiples of 10, so "rounded down" rounds the halved
+/// HP down to the nearest 10 (70 remaining becomes 30, i.e. 40 damage). The HP is set directly
+/// rather than dealt as damage, so Weakness and other damage modifiers do not apply.
+fn halve_opponent_active_hp() -> AttackOutcomes {
+    active_damage_effect_doutcome(0, move |_, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        let active = state.get_active_mut(opponent);
+        let remaining = active.get_remaining_hp();
+        let halved = (remaining / 20) * 10;
+        active.apply_damage(remaining - halved);
+    })
+}
+
+/// Maushold - Family Beatdown.
+fn coin_flip_per_named_pokemon_in_play_attack(
+    state: &State,
+    names: &[String],
+    damage_per_head: u32,
+) -> AttackOutcomes {
+    let num_coins = state
+        .enumerate_in_play_pokemon(state.current_player)
+        .filter(|(_, pokemon)| names.contains(&pokemon.get_name()))
+        .count();
+    AttackOutcomes::binomial_by_heads(num_coins, move |heads| {
+        active_damage_outcome(heads as u32 * damage_per_head)
+    })
+}
+
+/// Guzzlord - Breakcore. Discarding the Defending Pokémon is not a Knock Out, so it awards no
+/// point; the opponent simply has to promote a replacement.
+fn coin_flip_discard_opponent_active() -> AttackOutcomes {
+    AttackOutcomes::binary_coin(
+        active_damage_effect_outcome(0, move |_, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            state.discard_from_play(opponent, 0);
+            state.trigger_promotion_or_declare_winner(opponent);
+        }),
+        active_damage_outcome(0),
+    )
+}
+
+/// Fan Rotom - Spin Storm. The Pokémon and the cards under it go back to their owner's hand;
+/// attached Energy is discarded and any attached Tool goes to the discard pile.
+fn coin_flip_return_opponent_active_to_hand() -> AttackOutcomes {
+    AttackOutcomes::binary_coin(
+        active_damage_effect_outcome(0, move |_, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            let active = state.in_play_pokemon[opponent][0]
+                .take()
+                .expect("Active Pokemon should be there");
+
+            let mut cards_to_hand = active.cards_behind.clone();
+            cards_to_hand.push(active.card.clone());
+            state.hands[opponent].extend(cards_to_hand);
+
+            if let Some(tool_card) = active.attached_tool.clone() {
+                state.discard_piles[opponent].push(tool_card);
+            }
+            state.discard_energies[opponent].extend(active.attached_energy.iter().cloned());
+
+            state.refresh_double_grass_bonus_for_player(opponent);
+            state.trigger_promotion_or_declare_winner(opponent);
+        }),
+        active_damage_outcome(0),
+    )
+}
+
+/// Chinchou - Luring Glow.
+fn coin_flip_knock_back_opponent_active(damage: u32) -> AttackOutcomes {
+    AttackOutcomes::binary_coin(
+        active_damage_effect_outcome(damage, move |_, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            let choices: Vec<SimpleAction> = state
+                .enumerate_bench_pokemon(opponent)
+                .map(|(in_play_idx, _)| SimpleAction::Activate {
+                    player: opponent,
+                    in_play_idx,
+                })
+                .collect();
+            if choices.is_empty() {
+                return; // No benched pokemon to switch in
+            }
+            state.move_generation_stack.push((opponent, choices));
+        }),
+        active_damage_outcome(damage),
+    )
+}
+
+/// Origin Forme Dialga - Time Mash / Hippowdon - Crashing Fangs / Oinkologne - Leg Stomp.
+fn coin_flip_tails_self_card_effect(
+    damage: u32,
+    effect: CardEffect,
+    duration: u8,
+) -> AttackOutcomes {
+    AttackOutcomes::binary_coin(
+        active_damage_outcome(damage),
+        active_damage_effect_outcome(damage, move |_, state, action| {
+            state
+                .get_active_mut(action.actor)
+                .add_effect(effect.clone(), duration);
+        }),
+    )
+}
+
+/// Number of Energy attached to `player`'s Active Pokémon.
+fn active_energy_count(state: &State, player: usize) -> usize {
+    state.get_active(player).attached_energy.len()
+}
+
+/// Mr. Mime - Synchro Dance.
+fn extra_damage_if_same_energy_count_as_opponent(
+    state: &State,
+    base: u32,
+    extra: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let same =
+        active_energy_count(state, state.current_player) == active_energy_count(state, opponent);
+    active_damage_doutcome(if same { base + extra } else { base })
+}
+
+/// Enamorus - Smitten Strike / Kecleon - Samesies Slap.
+fn extra_damage_if_shared_energy_type_with_opponent(
+    state: &State,
+    base: u32,
+    extra: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let defender_energy = &state.get_active(opponent).attached_energy;
+    let shares_type = state
+        .get_active(state.current_player)
+        .attached_energy
+        .iter()
+        .any(|energy| defender_energy.contains(energy));
+    active_damage_doutcome(if shares_type { base + extra } else { base })
+}
+
+/// Team Rocket's Lapras - Ruthless Whirlpool / Scrafty - Crush the Weak.
+fn extra_damage_if_more_energy_than_opponent(
+    state: &State,
+    base: u32,
+    extra: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let has_more =
+        active_energy_count(state, state.current_player) > active_energy_count(state, opponent);
+    active_damage_doutcome(if has_more { base + extra } else { base })
+}
+
+/// Ludicolo - Rhythmic Steps / Luvdisc - Paired Tackle.
+fn extra_damage_if_hand_size_in(
+    state: &State,
+    base: u32,
+    hand_sizes: &[usize],
+    extra: u32,
+) -> AttackOutcomes {
+    let hand_size = state.hands[state.current_player].len();
+    let matches = hand_sizes.contains(&hand_size);
+    active_damage_doutcome(if matches { base + extra } else { base })
+}
+
+/// Chimecho - Extrasensory.
+fn extra_damage_if_same_hand_size_as_opponent(
+    state: &State,
+    base: u32,
+    extra: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let same = state.hands[state.current_player].len() == state.hands[opponent].len();
+    active_damage_doutcome(if same { base + extra } else { base })
+}
+
+/// Tyrantrum - Tyrannical Fang.
+fn extra_damage_if_fewer_pokemon_in_play(state: &State, base: u32, extra: u32) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let own = state
+        .enumerate_in_play_pokemon(state.current_player)
+        .count();
+    let theirs = state.enumerate_in_play_pokemon(opponent).count();
+    active_damage_doutcome(if own < theirs { base + extra } else { base })
+}
+
+/// Pheromosa - Prelude.
+fn extra_damage_if_no_points(state: &State, base: u32, extra: u32) -> AttackOutcomes {
+    let has_no_points = state.points[state.current_player] == 0;
+    active_damage_doutcome(if has_no_points { base + extra } else { base })
+}
+
+/// Ting-Lu - Arrogant Impact.
+fn no_damage_if_self_hp_at_most(state: &State, base: u32, threshold: u32) -> AttackOutcomes {
+    let attacker = state.get_active(state.current_player);
+    active_damage_doutcome(if attacker.get_remaining_hp() <= threshold {
+        0
+    } else {
+        base
+    })
+}
+
+/// Flutter Mane - Hexing Flight.
+fn damage_only_if_moved_from_bench(state: &State, base: u32) -> AttackOutcomes {
+    let moved = state
+        .get_active(state.current_player)
+        .moved_to_active_this_turn;
+    active_damage_doutcome(if moved { base } else { 0 })
+}
+
 fn copy_attack(
     _state: &State,
     source: &CopyAttackSource,
     require_attacker_energy_match: bool,
+    coin_flip: bool,
 ) -> AttackOutcomes {
     let source = source.clone();
-    active_damage_effect_doutcome(0, move |_, state, action| {
+    let offer_copies = move |_: &mut StdRng, state: &mut State, action: &Action| {
         let choices =
             copied_attack_choices(state, action.actor, &source, require_attacker_energy_match);
         if !choices.is_empty() {
             state.move_generation_stack.push((action.actor, choices));
         }
-    })
+    };
+    if coin_flip {
+        // Mimikyu's Try to Imitate / Clefairy's Mini-Metronome: on tails nothing happens at all.
+        AttackOutcomes::binary_coin(
+            active_damage_effect_outcome(0, offer_copies),
+            AttackOutcome::noop(),
+        )
+    } else {
+        active_damage_effect_doutcome(0, offer_copies)
+    }
 }
 
 fn copied_attack_choices(
@@ -1643,7 +2000,7 @@ where
             // copy is free (e.g. Mew ex's Genome Hacking).
             if require_attacker_energy_match {
                 let active = state.get_active(acting_player);
-                let modified_cost = get_attack_cost(&attack.energy_required, state, acting_player);
+                let modified_cost = get_effective_attack_cost(&attack, state, acting_player);
                 if !contains_energy(active, &modified_cost, state, acting_player) {
                     continue;
                 }
@@ -3012,15 +3369,27 @@ fn heal_one_your_benched_pokemon_attack(amount: u32) -> AttackOutcomes {
     })
 }
 
-fn heal_all_your_pokemon_attack(damage: u32, heal: u32) -> AttackOutcomes {
+fn heal_all_your_pokemon_attack(
+    damage: u32,
+    heal: u32,
+    energy_type: Option<EnergyType>,
+) -> AttackOutcomes {
     active_damage_effect_doutcome(damage, move |_, state, action| {
-        heal_all_pokemon(state, action.actor, heal);
+        heal_all_pokemon(state, action.actor, heal, energy_type);
     })
 }
 
-fn heal_all_pokemon(state: &mut State, player: usize, amount: u32) {
+/// Heal every in-play Pokémon of `player`, or only those of `energy_type` when it is given.
+fn heal_all_pokemon(
+    state: &mut State,
+    player: usize,
+    amount: u32,
+    energy_type: Option<EnergyType>,
+) {
     for pokemon in state.in_play_pokemon[player].iter_mut().flatten() {
-        pokemon.heal(amount);
+        if energy_type.is_none() || pokemon.get_energy_type() == energy_type {
+            pokemon.heal(amount);
+        }
     }
 }
 
@@ -4028,13 +4397,20 @@ fn extra_damage_if_knocked_out_last_turn_attack(
     base_damage: u32,
     energy_type: Option<EnergyType>,
     extra_damage: u32,
+    status: Option<StatusCondition>,
 ) -> AttackOutcomes {
-    let damage = if state.was_knocked_out_by_opponent_attack_last_turn(energy_type) {
-        base_damage + extra_damage
-    } else {
-        base_damage
-    };
-    active_damage_doutcome(damage)
+    if !state.was_knocked_out_by_opponent_attack_last_turn(energy_type) {
+        return active_damage_doutcome(base_damage);
+    }
+    let damage = base_damage + extra_damage;
+    match status {
+        // Lapras' Raging Freeze / Toxtricity's Vengeful Shock also inflict a Special Condition.
+        Some(status) => active_damage_effect_doutcome(damage, move |_, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            state.apply_status_condition(opponent, 0, status);
+        }),
+        None => active_damage_doutcome(damage),
+    }
 }
 
 fn extra_damage_if_attack_used_during_own_last_turn(
@@ -4109,16 +4485,7 @@ fn extra_damage_if_evolved_from_this_turn_attack(
     pokemon_name: &str,
     extra_damage: u32,
 ) -> AttackOutcomes {
-    let evolved_from_named = state.in_play_pokemon[state.current_player][0]
-        .as_ref()
-        .is_some_and(|active| {
-            active.played_this_turn
-                && active
-                    .cards_behind
-                    .last()
-                    .is_some_and(|under| under.get_name() == pokemon_name)
-        });
-    let damage = if evolved_from_named {
+    let damage = if evolved_from_named_this_turn(state, pokemon_name) {
         base_damage + extra_damage
     } else {
         base_damage
@@ -5103,15 +5470,11 @@ fn extra_damage_if_card_in_discard_attack(
     card_name: String,
     extra_damage: u32,
 ) -> AttackOutcomes {
+    // Matches any card in the discard pile by name, Trainer or Pokémon (e.g. Sunflora's
+    // Quick-Grow Beam names an Item, Illumise's Ire-Fly names Volbeat).
     let has_card_in_discard = state.discard_piles[state.current_player]
         .iter()
-        .any(|card| {
-            if let crate::models::Card::Trainer(trainer) = card {
-                trainer.name == card_name
-            } else {
-                false
-            }
-        });
+        .any(|card| card.get_name() == card_name);
     let total_damage = if has_card_in_discard {
         base_damage + extra_damage
     } else {

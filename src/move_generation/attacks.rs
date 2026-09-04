@@ -2,7 +2,7 @@ use crate::{
     actions::{abilities::AbilityMechanic, Mechanic, SimpleAction, EFFECT_MECHANIC_MAP},
     card_ids::CardId,
     effects::CardEffect,
-    hooks::{contains_energy, get_attack_cost},
+    hooks::{contains_energy, get_effective_attack_cost},
     models::{Attack, PlayedCard},
     tools::has_tool,
     State,
@@ -73,7 +73,7 @@ pub(crate) fn generate_attack_actions(state: &State) -> Vec<SimpleAction> {
             if !attack_precondition_met(state, current_player, &attack) {
                 continue;
             }
-            let modified_cost = get_attack_cost(&attack.energy_required, state, current_player);
+            let modified_cost = get_effective_attack_cost(&attack, state, current_player);
             if contains_energy(active_pokemon, &modified_cost, state, current_player) {
                 offered.push(attack.clone());
                 actions.push(SimpleAction::Attack(attack));

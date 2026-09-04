@@ -6,12 +6,13 @@ use log::debug;
 use crate::{
     actions::{
         abilities::AbilityMechanic, ability_mechanic_from_effect, get_ability_mechanic,
-        SimpleAction,
+        AttackCostCondition, Mechanic, SimpleAction, EFFECT_MECHANIC_MAP,
     },
     card_ids::CardId,
     effects::{CardEffect, TurnEffect},
     models::{
-        Card, EnergyType, PlayedCard, StatusCondition, TrainerCard, TrainerType, BASIC_STAGE,
+        Attack, Card, EnergyType, PlayedCard, StatusCondition, TrainerCard, TrainerType,
+        BASIC_STAGE,
     },
     stadiums::{
         get_arena_of_antiquity_damage_bonus, get_training_area_damage_bonus,
@@ -1589,6 +1590,42 @@ fn calculate_type_boost_bonus(
 }
 
 // Get the attack cost, considering abilities and active card effects that modify attack costs.
+/// The Energy cost `player` must pay to use `attack`, including any "this attack can be used
+/// for <cheaper cost>" substitution (Boltund's Defiant Spark, Veluza's Shedding Spiral) before
+/// the usual `get_attack_cost` modifiers are applied. Move generation and the copied-attack
+/// affordability check both go through this.
+pub(crate) fn get_effective_attack_cost(
+    attack: &Attack,
+    state: &State,
+    attacking_player: usize,
+) -> Vec<EnergyType> {
+    let base_cost = alternate_attack_cost(attack, state, attacking_player)
+        .unwrap_or_else(|| attack.energy_required.clone());
+    get_attack_cost(&base_cost, state, attacking_player)
+}
+
+/// The cheaper cost an attack may be used for right now, when its effect grants one and the
+/// condition currently holds.
+fn alternate_attack_cost(
+    attack: &Attack,
+    state: &State,
+    attacking_player: usize,
+) -> Option<Vec<EnergyType>> {
+    let effect_text = attack.effect.as_deref()?;
+    let Some(Mechanic::AlternateAttackCost { condition, cost }) =
+        EFFECT_MECHANIC_MAP.get(effect_text)
+    else {
+        return None;
+    };
+    let holds = match condition {
+        AttackCostCondition::SelfHasDamage => state.in_play_pokemon[attacking_player][0]
+            .as_ref()
+            .is_some_and(|active| active.is_damaged()),
+        AttackCostCondition::EmptyDeck => state.decks[attacking_player].cards.is_empty(),
+    };
+    holds.then(|| cost.clone())
+}
+
 pub(crate) fn get_attack_cost(
     base_cost: &[EnergyType],
     state: &State,
