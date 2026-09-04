@@ -232,6 +232,8 @@ mod meowth_carefree_steps_test;
 mod mew_miraculous_memory_test;
 #[path = "pokemon/milotic_ex_aqua_charge_test.rs"]
 mod milotic_ex_aqua_charge_test;
+#[path = "pokemon/mimic_shuffle_draw_test.rs"]
+mod mimic_shuffle_draw_test;
 #[path = "pokemon/miraidon_ex_test.rs"]
 mod miraidon_ex_test;
 #[path = "pokemon/morpeko_test.rs"]
@@ -280,6 +282,8 @@ mod raichu_evoshock_test;
 mod rampardos_head_smash_test;
 #[path = "pokemon/regidrago_draconic_slam_test.rs"]
 mod regidrago_draconic_slam_test;
+#[path = "pokemon/reveal_top_damage_test.rs"]
+mod reveal_top_damage_test;
 #[path = "pokemon/rhyperior_test.rs"]
 mod rhyperior_test;
 #[path = "pokemon/roaring_moon_test.rs"]
@@ -310,6 +314,8 @@ mod spewpa_signs_of_evolution_test;
 mod sunflora_quick_grow_beam_test;
 #[path = "pokemon/swift_shot_test.rs"]
 mod swift_shot_test;
+#[path = "pokemon/switch_opponent_bench_in_test.rs"]
+mod switch_opponent_bench_in_test;
 #[path = "pokemon/sylveon_soothing_ribbon_test.rs"]
 mod sylveon_soothing_ribbon_test;
 #[path = "pokemon/tandemaus_b2_test.rs"]
@@ -322,6 +328,8 @@ mod team_rockets_moltres_ex_heat_charged_test;
 mod team_rockets_raticate_ex_test;
 #[path = "pokemon/team_rockets_slowking_ex_test.rs"]
 mod team_rockets_slowking_ex_test;
+#[path = "pokemon/team_rockets_slowpoke_scavenge_test.rs"]
+mod team_rockets_slowpoke_scavenge_test;
 #[path = "pokemon/team_rockets_weezing_ex_test.rs"]
 mod team_rockets_weezing_ex_test;
 #[path = "pokemon/team_rockets_zapdos_ex_thunderclaw_test.rs"]
