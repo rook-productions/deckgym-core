@@ -20,6 +20,8 @@ mod applin_share_test;
 mod arcanine_test;
 #[path = "pokemon/arceus_ex_test.rs"]
 mod arceus_ex_test;
+#[path = "pokemon/attacks_a_new_mechanics_test.rs"]
+mod attacks_a_new_mechanics_test;
 #[path = "pokemon/attacks_a_reused_mechanics_test.rs"]
 mod attacks_a_reused_mechanics_test;
 #[path = "pokemon/audino_test.rs"]

@@ -176,6 +176,7 @@ pub fn forecast_action(state: &State, action: &Action) -> Outcomes {
         | SimpleAction::Activate { .. }
         | SimpleAction::Retreat(_)
         | SimpleAction::ScheduleDelayedSpotDamage { .. }
+        | SimpleAction::ScheduleDelayedSpotKnockOut { .. }
         | SimpleAction::Heal { .. }
         | SimpleAction::HealAndDiscardEnergy { .. }
         | SimpleAction::MoveAllDamage { .. }
@@ -183,6 +184,7 @@ pub fn forecast_action(state: &State, action: &Action) -> Outcomes {
         | SimpleAction::HealAllEeveeEvolutions
         | SimpleAction::DiscardFossil { .. }
         | SimpleAction::DiscardOwnBenchedThenDamage { .. }
+        | SimpleAction::DiscardOwnCardsThenDamage { .. }
         | SimpleAction::ReturnPokemonToHand { .. }
         | SimpleAction::ShuffleInPlayPokemonIntoDeck { .. }
         | SimpleAction::DiscardToolFromPokemon { .. }
@@ -432,6 +434,15 @@ fn apply_deterministic_action(state: &mut State, action: &Action) {
             *target_in_play_idx,
             *amount,
         ),
+        SimpleAction::ScheduleDelayedSpotKnockOut {
+            target_player,
+            target_in_play_idx,
+        } => apply_schedule_delayed_spot_knock_out(
+            state,
+            action.actor,
+            *target_player,
+            *target_in_play_idx,
+        ),
         // Trainer-Specific Actions
         SimpleAction::Heal {
             in_play_idx,
@@ -463,6 +474,19 @@ fn apply_deterministic_action(state: &mut State, action: &Action) {
             in_play_idx,
             damage,
         } => apply_discard_own_benched_then_damage(action.actor, state, *in_play_idx, *damage),
+        SimpleAction::DiscardOwnCardsThenDamage {
+            cards,
+            damage,
+            target_player,
+            target_in_play_idx,
+        } => apply_discard_own_cards_then_damage(
+            action.actor,
+            state,
+            cards,
+            *damage,
+            *target_player,
+            *target_in_play_idx,
+        ),
         SimpleAction::ReturnPokemonToHand { in_play_idx } => {
             apply_return_pokemon_to_hand(action.actor, state, *in_play_idx)
         }
@@ -677,6 +701,29 @@ fn apply_discard_own_benched_then_damage(
     ));
 }
 
+/// Slowking's Litter: discard the chosen Tool cards from hand, then queue the resulting damage so
+/// it goes through the regular damage pipeline as a single application.
+fn apply_discard_own_cards_then_damage(
+    acting_player: usize,
+    state: &mut State,
+    cards: &[Card],
+    damage: u32,
+    target_player: usize,
+    target_in_play_idx: usize,
+) {
+    for card in cards {
+        state.discard_card_from_hand(acting_player, card);
+    }
+    state.move_generation_stack.push((
+        acting_player,
+        vec![SimpleAction::ApplyDamage {
+            attacking_ref: (acting_player, 0),
+            targets: vec![(damage, target_player, target_in_play_idx)],
+            is_from_active_attack: true,
+        }],
+    ));
+}
+
 fn apply_return_pokemon_to_hand(acting_player: usize, state: &mut State, in_play_idx: usize) {
     let played_card = state.in_play_pokemon[acting_player][in_play_idx]
         .take()
@@ -737,6 +784,22 @@ fn apply_schedule_delayed_spot_damage(
             target_player,
             target_in_play_idx,
             amount,
+        },
+        1,
+    );
+}
+
+fn apply_schedule_delayed_spot_knock_out(
+    state: &mut State,
+    source_player: usize,
+    target_player: usize,
+    target_in_play_idx: usize,
+) {
+    state.add_turn_effect(
+        TurnEffect::DelayedSpotKnockOut {
+            source_player,
+            target_player,
+            target_in_play_idx,
         },
         1,
     );

@@ -80,6 +80,12 @@ pub enum SimpleAction {
         target_in_play_idx: usize,
         amount: u32,
     },
+    /// Armaldo's Abyssal Drop: schedule an outright Knock Out of whatever occupies the chosen
+    /// spot at the end of the target player's next turn.
+    ScheduleDelayedSpotKnockOut {
+        target_player: usize,
+        target_in_play_idx: usize,
+    },
     /// Switch the in_play_idx pokemon with the active pokemon.
     Activate {
         player: usize,
@@ -113,6 +119,16 @@ pub enum SimpleAction {
     /// Discard multiple specific cards from own hand
     DiscardOwnCards {
         cards: Vec<Card>,
+    },
+    /// Slowking's Litter: discard a chosen set of cards from your own hand, then deal `damage` to
+    /// one target. Like `DiscardOwnBenchedThenDamage`, the two halves are one action so the
+    /// damage — which depends on how many cards were discarded — is applied exactly once and goes
+    /// through the damage modifiers a single time.
+    DiscardOwnCardsThenDamage {
+        cards: Vec<Card>,
+        damage: u32,
+        target_player: usize,
+        target_in_play_idx: usize,
     },
     /// Team Rocket's Boss: put a chosen subset of Basic Pokémon found in the opponent's hand
     /// onto the opponent's Bench
@@ -275,6 +291,13 @@ impl fmt::Display for SimpleAction {
                     attacking_ref, targets_str, is_from_active_attack
                 )
             }
+            SimpleAction::ScheduleDelayedSpotKnockOut {
+                target_player,
+                target_in_play_idx,
+            } => write!(
+                f,
+                "ScheduleDelayedSpotKnockOut(target:{target_player}:{target_in_play_idx})"
+            ),
             SimpleAction::ScheduleDelayedSpotDamage {
                 target_player,
                 target_in_play_idx,
@@ -305,6 +328,15 @@ impl fmt::Display for SimpleAction {
             SimpleAction::DiscardOpponentSupporter { supporter_card } => {
                 write!(f, "DiscardOpponentSupporter({supporter_card})")
             }
+            SimpleAction::DiscardOwnCardsThenDamage {
+                cards,
+                damage,
+                target_player,
+                target_in_play_idx,
+            } => write!(
+                f,
+                "DiscardOwnCardsThenDamage({cards:?}, {damage} to {target_player}:{target_in_play_idx})"
+            ),
             SimpleAction::DiscardOwnCards { cards } => {
                 write!(f, "DiscardOwnCards({:?})", cards)
             }

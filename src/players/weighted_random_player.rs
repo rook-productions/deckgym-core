@@ -50,6 +50,7 @@ fn get_weight(action: &SimpleAction) -> u32 {
         SimpleAction::Attack(_) => 10,
         SimpleAction::ApplyDamage { .. } => 10,
         SimpleAction::ScheduleDelayedSpotDamage { .. } => 10,
+        SimpleAction::ScheduleDelayedSpotKnockOut { .. } => 10,
         SimpleAction::Retreat(_) => 2,
         SimpleAction::EndTurn => 1,
         SimpleAction::Heal { .. } => 5,
@@ -71,6 +72,7 @@ fn get_weight(action: &SimpleAction) -> u32 {
         SimpleAction::HealAllEeveeEvolutions => 5,
         SimpleAction::DiscardFossil { .. } => 1, // Low weight to discard fossils
         SimpleAction::DiscardOwnBenchedThenDamage { .. } => 5, // Trading a Benched Pokemon for damage
+        SimpleAction::DiscardOwnCardsThenDamage { .. } => 5,   // Trading hand Tools for damage
 
         SimpleAction::ReturnPokemonToHand { .. } => 5,
         SimpleAction::ShuffleInPlayPokemonIntoDeck { .. } => 5,

@@ -71,7 +71,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             conditions: vec![StatusCondition::Confused],
         },
     );
-    // map.insert("Change the type of a random Energy attached to your opponent's Active Pokémon to 1 of the following at random: [G], [R], [W], [L], [P], [F], [D], or [M].", todo_implementation);
+    map.insert(
+        "Change the type of a random Energy attached to your opponent's Active Pokémon to 1 of the following at random: [G], [R], [W], [L], [P], [F], [D], or [M].",
+        Mechanic::RandomizeOpponentActiveEnergyType,
+    );
     map.insert(
         "Change the type of the next Energy that will be generated for your opponent to 1 of the following at random: [G], [R], [W], [L], [P], [F], [D], or [M].",
         Mechanic::RandomizeOpponentNextEnergy,
@@ -130,7 +133,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             energies: vec![EnergyType::Fire, EnergyType::Fire],
         },
     );
-    // map.insert("Discard 2 [R] Energy from this Pokémon. This attack does 80 damage to 1 of your opponent's Pokémon.", todo_implementation);
+    map.insert(
+        "Discard 2 [R] Energy from this Pokémon. This attack does 80 damage to 1 of your opponent's Pokémon.",
+        Mechanic::SelfDiscardEnergyAndDamageAnyOpponentPokemon {
+            energies: vec![EnergyType::Fire, EnergyType::Fire],
+            damage: 80,
+        },
+    );
     map.insert(
         "Discard 2 cards from your hand. If you can't discard 2 cards, this attack does nothing.",
         Mechanic::DiscardHandCards { count: 2 },
@@ -203,10 +212,28 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Discard a random Energy from your opponent's Active Pokémon.",
         Mechanic::DiscardEnergyFromOpponentActive,
     );
-    // map.insert("Discard a random Item card from your opponent's hand.", todo_implementation);
-    // map.insert("Discard a random Pokémon Tool card from your opponent's hand.", todo_implementation);
-    // map.insert("Discard a random card from your opponent's hand.", todo_implementation);
-    // map.insert("Discard all Energy attached to this Pokémon. Your opponent's Active Pokémon is now Paralyzed.", todo_implementation);
+    map.insert(
+        "Discard a random Item card from your opponent's hand.",
+        Mechanic::DiscardRandomOpponentHandCard {
+            trainer_type: Some(TrainerType::Item),
+        },
+    );
+    map.insert(
+        "Discard a random Pokémon Tool card from your opponent's hand.",
+        Mechanic::DiscardRandomOpponentHandCard {
+            trainer_type: Some(TrainerType::Tool),
+        },
+    );
+    map.insert(
+        "Discard a random card from your opponent's hand.",
+        Mechanic::DiscardRandomOpponentHandCard { trainer_type: None },
+    );
+    map.insert(
+        "Discard all Energy attached to this Pokémon. Your opponent's Active Pokémon is now Paralyzed.",
+        Mechanic::SelfDiscardAllEnergyAndInflictStatus {
+            conditions: vec![StatusCondition::Paralyzed],
+        },
+    );
     map.insert(
         "Discard all Energy from this Pokémon.",
         Mechanic::SelfDiscardAllEnergy,
@@ -236,13 +263,29 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Discard the top 3 cards of your opponent's deck.",
         Mechanic::DamageAndDiscardOpponentDeck { discard_count: 3 },
     );
-    // map.insert("Discard the top 5 cards of each player's deck.", todo_implementation);
-    // map.insert("Discard the top card of your deck. If that card is a [F] Pokémon, this attack does 60 more damage.", todo_implementation);
+    map.insert(
+        "Discard the top 5 cards of each player's deck.",
+        Mechanic::DiscardTopEachPlayerDeck { count: 5 },
+    );
+    map.insert(
+        "Discard the top card of your deck. If that card is a [F] Pokémon, this attack does 60 more damage.",
+        Mechanic::DiscardTopSelfDeckExtraDamageIfMatch {
+            trainer_type: None,
+            energy_type: Some(EnergyType::Fighting),
+            extra_damage: 60,
+        },
+    );
     map.insert(
         "Discard the top card of your opponent's deck.",
         Mechanic::DamageAndDiscardOpponentDeck { discard_count: 1 },
     );
-    // map.insert("Discard up to 2 Pokémon Tool cards from your hand. This attack does 50 damage for each card you discarded in this way.", todo_implementation);
+    map.insert(
+        "Discard up to 2 Pokémon Tool cards from your hand. This attack does 50 damage for each card you discarded in this way.",
+        Mechanic::DiscardToolsFromHandForDamage {
+            max_cards: 2,
+            damage_per_card: 50,
+        },
+    );
     map.insert("Draw a card.", Mechanic::DrawCard { amount: 1 });
     map.insert(
         "Draw a card for each Poochyena you have in play.",
@@ -250,7 +293,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             name: "Poochyena".to_string(),
         },
     );
-    // map.insert("Draw cards until you have the same number of cards in your hand as your opponent.", todo_implementation);
+    map.insert(
+        "Draw cards until you have the same number of cards in your hand as your opponent.",
+        Mechanic::DrawUntilHandMatchesOpponent,
+    );
     map.insert(
         "During your next turn, this Pokémon can't attack.",
         Mechanic::DamageAndCardEffect {
@@ -528,8 +574,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Flip 2 coins. If both of them are heads, this attack does 100 more damage.",
         Mechanic::ExtraDamageIfBothHeads { extra_damage: 100 },
     );
-    // map.insert("Flip 2 coins. If both of them are heads, your opponent's Active Pokémon is Knocked Out.", todo_implementation);
-    // map.insert("Flip 2 coins. If both of them are tails, this attack does nothing.", todo_implementation);
+    map.insert(
+        "Flip 2 coins. If both of them are heads, your opponent's Active Pokémon is Knocked Out.",
+        Mechanic::AllHeadsKnockOutOpponentActive { num_coins: 2 },
+    );
+    map.insert(
+        "Flip 2 coins. If both of them are tails, this attack does nothing.",
+        Mechanic::NoDamageIfAllTails { num_coins: 2 },
+    );
     map.insert(
         "Flip 2 coins. This attack does 100 damage for each heads.",
         Mechanic::ExtraDamageForEachHeads {
@@ -1927,6 +1979,33 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
     // Attacks whose effect text is not present in the generated skeleton above.
     // ------------------------------------------------------------------------------------------
     map.insert(
+        "Before doing damage, shuffle all Pokémon Tools from each of your opponent's Pokémon into their deck.",
+        Mechanic::ShuffleOpponentToolsIntoDeckBeforeDamage,
+    );
+    map.insert(
+        "Discard 3 [W] Energy from this Pokémon, and this attack does 50 damage to each of your opponent's Pokémon.",
+        Mechanic::SelfDiscardEnergyAndDamageAllOpponentPokemon {
+            energies: vec![EnergyType::Water, EnergyType::Water, EnergyType::Water],
+            damage: 50,
+        },
+    );
+    map.insert(
+        "Discard all Energy from this Pokémon. Choose a spot from among your opponent's Active Spot and Bench. At the end of your opponent's next turn, Knock Out the Pokémon in the spot you chose.",
+        Mechanic::SelfDiscardAllEnergyAndDelayedSpotKnockOut,
+    );
+    map.insert(
+        "Discard the top card of your deck, and if that card is an Item, this attack does 20 more damage.",
+        Mechanic::DiscardTopSelfDeckExtraDamageIfMatch {
+            trainer_type: Some(TrainerType::Item),
+            energy_type: None,
+            extra_damage: 20,
+        },
+    );
+    map.insert(
+        "Flip 2 coins. If both of them are heads, discard your opponent's Active Pokémon.",
+        Mechanic::AllHeadsDiscardOpponentActive { num_coins: 2 },
+    );
+    map.insert(
         "During your next turn, this Pokémon's Overacceleration attack does +70 damage.",
         Mechanic::DamageAndCardEffect {
             opponent: false,
@@ -2103,7 +2182,7 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             conditions: vec![StatusCondition::Paralyzed],
         },
     );
-    // map.insert("Discard a Stadium in play.", todo_implementation);
+    map.insert("Discard a Stadium in play.", Mechanic::DiscardStadiumInPlay);
     map.insert(
         "During your next turn, attacks used by your Pokémon do +20 damage to your opponent's Active Pokémon.",
         Mechanic::DamageAndTurnEffect {
@@ -2464,7 +2543,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             include_own_bench: false,
         },
     );
-    // map.insert("Discard 2 random Energy from among the Energy attached to all of your Pokémon.", todo_implementation);
+    map.insert(
+        "Discard 2 random Energy from among the Energy attached to all of your Pokémon.",
+        Mechanic::DiscardRandomEnergyFromAllYourPokemon { count: 2 },
+    );
     map.insert(
         "Discard Grass[G] Energy from this Pokémon. Your opponent's Active Pokémon is now Poisoned.",
         Mechanic::SelfDiscardEnergyAndInflictStatus {
@@ -2484,7 +2566,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             energy_type: EnergyType::Fire,
         },
     );
-    // map.insert("Discard a [W] Energy from this Pokémon, and this attack also does 40 damage to 1 of your opponent's Benched Pokémon.", todo_implementation);
+    map.insert(
+        "Discard a [W] Energy from this Pokémon, and this attack also does 40 damage to 1 of your opponent's Benched Pokémon.",
+        Mechanic::SelfDiscardEnergyAndChoiceBenchDamage {
+            energies: vec![EnergyType::Water],
+            opponent: true,
+            bench_damage: 40,
+        },
+    );
     map.insert(
         "Discard the top card of your deck.",
         Mechanic::DiscardTopSelfDeck { count: 1 },

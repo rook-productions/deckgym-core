@@ -137,6 +137,19 @@ pub enum TurnEffect {
         target_in_play_idx: usize,
         amount: u32,
     },
+    /// Armaldo's Abyssal Drop: whatever occupies `target_in_play_idx` on `target_player`'s board
+    /// at the end of their turn is Knocked Out outright. The knock-out twin of
+    /// `DelayedSpotDamage` — it is not damage, so it ignores damage reduction and prevention.
+    DelayedSpotKnockOut {
+        source_player: usize,
+        target_player: usize,
+        target_in_play_idx: usize,
+    },
+    /// Malamar's Evolution Jammer: `player` can't play Pokémon from their hand to evolve their
+    /// Pokémon.
+    NoEvolutionFromHand {
+        player: usize,
+    },
     ForceFirstHeads,
     /// A random-spread attack with this name chooses a Pokémon `amount` more times
     /// (e.g. Drayden boosting Draco Meteor).

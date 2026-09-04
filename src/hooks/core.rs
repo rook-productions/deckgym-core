@@ -374,6 +374,37 @@ pub(crate) fn on_end_turn(player_ending_turn: usize, state: &mut State) {
         );
     }
 
+    // Process delayed spot KNOCK OUTS (Armaldo's Abyssal Drop). Like the spot damage above these
+    // target a board position, but they are not damage: whatever occupies the spot is Knocked Out
+    // regardless of damage reduction or prevention.
+    let triggered_spot_knock_outs: Vec<(usize, usize, usize)> = state
+        .get_current_turn_effects()
+        .into_iter()
+        .filter_map(|effect| match effect {
+            TurnEffect::DelayedSpotKnockOut {
+                source_player,
+                target_player,
+                target_in_play_idx,
+            } if target_player == player_ending_turn => {
+                Some((source_player, target_player, target_in_play_idx))
+            }
+            _ => None,
+        })
+        .collect();
+
+    for (source_player, target_player, target_in_play_idx) in triggered_spot_knock_outs {
+        let Some(target) = state.in_play_pokemon[target_player][target_in_play_idx].as_mut() else {
+            continue;
+        };
+        debug!(
+            "Delayed spot knock out: Knocking out player {} slot {}",
+            target_player, target_in_play_idx
+        );
+        let remaining_hp = target.get_remaining_hp();
+        target.apply_damage(remaining_hp);
+        crate::actions::handle_knockouts(state, (source_player, 0), false);
+    }
+
     // Discard Metal Core Barrier from the opponent's Pokémon at the end of this player's turn.
     // ("discard it at the end of your opponent's turn" — the tool owner is the other player)
     let tool_owner = (player_ending_turn + 1) % 2;
