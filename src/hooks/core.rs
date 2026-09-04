@@ -1571,8 +1571,38 @@ pub(crate) fn get_attack_cost(
 
     modified_cost = future_system_cost(modified_cost, state, attacking_player);
     modified_cost = vigor_link_cost(modified_cost, state, attacking_player);
+    modified_cost = tool_typed_discount_cost(modified_cost, state, attacking_player);
 
     modified_cost
+}
+
+/// Cherubi's En-fruits-iastic: "If this Pokémon has a Pokémon Tool attached, attacks used by this
+/// Pokémon cost 1 less [G] Energy."
+fn tool_typed_discount_cost(
+    mut cost: Vec<EnergyType>,
+    state: &State,
+    player: usize,
+) -> Vec<EnergyType> {
+    let Some(active) = state.in_play_pokemon[player][0].as_ref() else {
+        return cost;
+    };
+    if !active.has_tool_attached() {
+        return cost;
+    }
+    let Some(AbilityMechanic::ReduceTypedAttackCostIfHasTool {
+        energy_type,
+        amount,
+    }) = get_ability_mechanic(&active.card)
+    else {
+        return cost;
+    };
+    for _ in 0..*amount {
+        if let Some(pos) = cost.iter().position(|e| e == energy_type) {
+            debug!("En-fruits-iastic: Reducing attack cost by 1 {energy_type:?}");
+            cost.remove(pos);
+        }
+    }
+    cost
 }
 
 /// Abomasnow's Vigor Link: "If you have Arceus or Arceus ex in play, attacks used by this

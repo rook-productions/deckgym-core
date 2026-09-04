@@ -127,7 +127,13 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
                 energy_type: Some(EnergyType::Psychic),
             },
         );
-        // map.insert("Each of your [G] Pokémon gets +20 HP.", todo_implementation);
+        map.insert(
+            "Each of your [G] Pokémon gets +20 HP.",
+            AbilityMechanic::IncreaseHpOfYourTypedPokemon {
+                energy_type: EnergyType::Grass,
+                amount: 20,
+            },
+        );
         map.insert(
             "If a Stadium is in play, this Pokémon has no Retreat Cost.",
             AbilityMechanic::NoRetreatCostIfStadiumInPlay,
@@ -144,7 +150,13 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "If any damage is done to this Pokémon by attacks, flip a coin. If heads, this Pokémon takes -80 damage from that attack.",
             AbilityMechanic::CoinFlipToReduceDamage { amount: 80 },
         );
-        // map.insert("If this Pokémon has a Pokémon Tool attached, attacks used by this Pokémon cost 1 less [G] Energy.", todo_implementation);
+        map.insert(
+            "If this Pokémon has a Pokémon Tool attached, attacks used by this Pokémon cost 1 less [G] Energy.",
+            AbilityMechanic::ReduceTypedAttackCostIfHasTool {
+                energy_type: EnergyType::Grass,
+                amount: 1,
+            },
+        );
         map.insert(
             "If this Pokémon has any Energy attached, it has no Retreat Cost.",
             AbilityMechanic::NoRetreatIfHasEnergy,
@@ -468,7 +480,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
                 ],
             },
         );
-        // map.insert("Pokémon (both yours and your opponent's) can't be healed.", todo_implementation);
+        map.insert(
+            "Pokémon (both yours and your opponent's) can't be healed.",
+            AbilityMechanic::NoHealingForAnyone,
+        );
         map.insert(
             "Prevent all damage done to this Pokémon by attacks from your opponent's Pokémon ex.",
             AbilityMechanic::PreventAllDamageFromEx,
@@ -486,7 +501,12 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "This Pokémon can evolve into any Pokémon that evolves from Eevee if you play it from your hand onto this Pokémon. (This Pokémon can't evolve during your first turn or the turn you play it.)",
             AbilityMechanic::CanEvolveIntoEeveeEvolution,
         );
-        // map.insert("This Pokémon can't be Asleep.", todo_implementation);
+        map.insert(
+            "This Pokémon can't be Asleep.",
+            AbilityMechanic::ImmuneToStatusCondition {
+                condition: StatusCondition::Asleep,
+            },
+        );
         map.insert(
             "This Pokémon can't be affected by any Special Conditions.",
             AbilityMechanic::ImmuneToStatusConditions,
@@ -657,7 +677,16 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "During Pokémon Checkup, if this Pokémon is in the Active Spot, do 10 damage to each of your opponent's Pokémon.",
             AbilityMechanic::CheckupDamageToAllOpponentPokemon { amount: 10 },
         );
-        // map.insert("If you don't have Regirock, Regice, and Registeel on your Bench, this Pokémon can't attack.", todo_implementation);
+        map.insert(
+            "If you don't have Regirock, Regice, and Registeel on your Bench, this Pokémon can't attack.",
+            AbilityMechanic::CannotAttackUnlessNamedOnBench {
+                names: vec![
+                    "Regirock".to_string(),
+                    "Regice".to_string(),
+                    "Registeel".to_string(),
+                ],
+            },
+        );
         map.insert(
             "Once during your turn, after you flip any coins for an attack of 1 of your [R] Pokémon, you may ignore all results of those coin flips and begin flipping those coins again. You can't use more than 1 Victory Star Ability each turn.",
             AbilityMechanic::VictoryStarReflip,

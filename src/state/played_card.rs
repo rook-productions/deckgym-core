@@ -29,6 +29,14 @@ pub struct PlayedCard {
     /// Kept in sync via `State::refresh_double_grass_bonus_for_player` whenever the
     /// board composition for this Pokemon's owner changes.
     double_grass_active: bool,
+    /// Extra HP granted by an ability on this Pokémon's owner's board (Lilligant's Toughness
+    /// Aroma). Kept in sync by `State::refresh_ability_board_bonuses`, like `stadium_hp_bonus`.
+    #[serde(default)]
+    ability_hp_bonus: u32,
+    /// Whether a Heal Block ability (Claydol) is in play for either player, in which case
+    /// `heal` is a no-op. Kept in sync by `State::refresh_ability_board_bonuses`.
+    #[serde(default)]
+    heal_blocked: bool,
     pub attached_energy: Vec<EnergyType>,
     pub attached_tool: Option<Card>,
     pub played_this_turn: bool,
@@ -68,6 +76,8 @@ impl PlayedCard {
             base_hp,
             stadium_hp_bonus: 0,
             double_grass_active: false,
+            ability_hp_bonus: 0,
+            heal_blocked: false,
             attached_energy,
             played_this_turn,
             moved_to_active_this_turn: false,
@@ -168,6 +178,10 @@ impl PlayedCard {
     }
 
     pub(crate) fn heal(&mut self, amount: u32) {
+        // Claydol's Heal Block: "Pokémon (both yours and your opponent's) can't be healed."
+        if self.heal_blocked {
+            return;
+        }
         self.damage_counters = self.damage_counters.saturating_sub(amount);
     }
 
@@ -203,6 +217,26 @@ impl PlayedCard {
     pub(crate) fn refresh_double_grass_active(&mut self, jungle_totem_active_for_owner: bool) {
         self.double_grass_active =
             jungle_totem_active_for_owner && self.card.get_type() == Some(EnergyType::Grass);
+    }
+
+    /// Keeps the ability-derived board bonuses in sync. Called by
+    /// `State::refresh_ability_board_bonuses` whenever either player's board changes.
+    pub(crate) fn refresh_ability_board_bonuses(
+        &mut self,
+        typed_hp_bonuses: &[(EnergyType, u32)],
+        heal_blocked: bool,
+    ) {
+        self.ability_hp_bonus = self
+            .get_energy_type()
+            .map(|own_type| {
+                typed_hp_bonuses
+                    .iter()
+                    .filter(|(energy_type, _)| *energy_type == own_type)
+                    .map(|(_, amount)| *amount)
+                    .sum()
+            })
+            .unwrap_or(0);
+        self.heal_blocked = heal_blocked;
     }
 
     pub(crate) fn refresh_starting_plains_bonus(&mut self, starting_plains_active: bool) {
@@ -255,6 +289,7 @@ impl PlayedCard {
         }
 
         effective_hp += self.stadium_hp_bonus;
+        effective_hp += self.ability_hp_bonus;
 
         // E.g. Reuniclus Infinite Increase, Serperior Regal Bloom: +HP for each Energy of a type attached
         if let Some(AbilityMechanic::IncreaseHpPerAttachedEnergy {

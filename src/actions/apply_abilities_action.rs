@@ -239,8 +239,15 @@ fn forecast_ability_by_mechanic(
         AbilityMechanic::SearchRandomToolFromDeck => tool_search_outcomes(action.actor, state),
         AbilityMechanic::CoinFlipSleepOpponentActive => coin_flip_sleep_opponent_active(),
         AbilityMechanic::DiscardFromHandToDrawCard => discard_from_hand_to_draw_card(),
-        AbilityMechanic::ImmuneToStatusConditions => {
+        AbilityMechanic::ImmuneToStatusConditions
+        | AbilityMechanic::ImmuneToStatusCondition { .. } => {
             panic!("ImmuneToStatusConditions is a passive ability")
+        }
+        AbilityMechanic::ReduceTypedAttackCostIfHasTool { .. }
+        | AbilityMechanic::IncreaseHpOfYourTypedPokemon { .. }
+        | AbilityMechanic::NoHealingForAnyone
+        | AbilityMechanic::CannotAttackUnlessNamedOnBench { .. } => {
+            panic!("Board-wide static mechanics are passive abilities")
         }
         AbilityMechanic::SoothingWind { .. } => {
             panic!("SoothingWind is a passive ability")

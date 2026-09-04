@@ -1,5 +1,7 @@
 use crate::{
-    actions::{abilities::AbilityMechanic, has_ability_mechanic, SimpleAction},
+    actions::{
+        abilities::AbilityMechanic, get_ability_mechanic, has_ability_mechanic, SimpleAction,
+    },
     effects::CardEffect,
     hooks::{contains_energy, get_attack_cost},
     models::{Attack, PlayedCard},
@@ -22,6 +24,21 @@ pub(crate) fn generate_attack_actions(state: &State) -> Vec<SimpleAction> {
             .any(|effect| matches!(effect, CardEffect::CannotAttack));
         if cannot_attack {
             return actions;
+        }
+
+        // Regigigas's Seal of Antiquity: "If you don't have Regirock, Regice, and Registeel on
+        // your Bench, this Pokémon can't attack."
+        if let Some(AbilityMechanic::CannotAttackUnlessNamedOnBench { names }) =
+            get_ability_mechanic(&active_pokemon.card)
+        {
+            let all_on_bench = names.iter().all(|name| {
+                state
+                    .enumerate_bench_pokemon(current_player)
+                    .any(|(_, pokemon)| pokemon.get_name() == *name)
+            });
+            if !all_on_bench {
+                return actions;
+            }
         }
 
         let restricted_attack_names: Vec<String> = active_effects

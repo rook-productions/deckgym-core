@@ -198,6 +198,29 @@ impl State {
         for pokemon in self.in_play_pokemon[player].iter_mut().flatten() {
             pokemon.refresh_double_grass_active(jungle_totem_active);
         }
+        // A board change can also change the other ability-derived board bonuses, and this is the
+        // one refresh every board mutation already funnels through.
+        self.refresh_ability_board_bonuses();
+    }
+
+    /// Recomputes the cached, board-dependent ability bonuses on every in-play Pokémon:
+    /// Lilligant's Toughness Aroma (+HP for the owner's Pokémon of a type) and Claydol's Heal
+    /// Block (no Pokémon on either side can be healed).
+    pub(crate) fn refresh_ability_board_bonuses(&mut self) {
+        let heal_blocked = (0..2).any(|player| {
+            self.enumerate_in_play_pokemon(player).any(|(_, pokemon)| {
+                has_ability_mechanic(&pokemon.card, &AbilityMechanic::NoHealingForAnyone)
+            })
+        });
+        let typed_hp_bonuses: [Vec<(EnergyType, u32)>; 2] = [
+            collect_typed_hp_bonuses(self, 0),
+            collect_typed_hp_bonuses(self, 1),
+        ];
+        for player in 0..2 {
+            for pokemon in self.in_play_pokemon[player].iter_mut().flatten() {
+                pokemon.refresh_ability_board_bonuses(&typed_hp_bonuses[player], heal_blocked);
+            }
+        }
     }
 
     pub(crate) fn refresh_double_grass_bonus_all(&mut self) {
@@ -516,6 +539,15 @@ impl State {
             return;
         }
 
+        // Hoothoot's Insomnia: immune to one specific Special Condition.
+        if has_ability_mechanic(
+            &pokemon.card,
+            &AbilityMechanic::ImmuneToStatusCondition { condition: status },
+        ) {
+            debug!("Pokémon is immune to {status:?}");
+            return;
+        }
+
         // Steel Apron: "The [M] Pokémon this card is attached to ... can't be affected by any
         // Special Conditions." The immunity only applies to a [M] holder.
         if has_tool(pokemon, crate::card_ids::CardId::A4153SteelApron)
@@ -766,6 +798,22 @@ impl State {
     pub fn generate_possible_actions(&self) -> (usize, Vec<crate::actions::Action>) {
         move_generation::generate_possible_actions(self)
     }
+}
+
+/// The (type, +HP) bonuses granted by `player`'s in-play Pokémon (Lilligant's Toughness Aroma).
+fn collect_typed_hp_bonuses(state: &State, player: usize) -> Vec<(EnergyType, u32)> {
+    state
+        .enumerate_in_play_pokemon(player)
+        .filter_map(
+            |(_, pokemon)| match crate::actions::get_ability_mechanic(&pokemon.card) {
+                Some(AbilityMechanic::IncreaseHpOfYourTypedPokemon {
+                    energy_type,
+                    amount,
+                }) => Some((*energy_type, *amount)),
+                _ => None,
+            },
+        )
+        .collect()
 }
 
 fn format_cards(played_cards: &[Option<PlayedCard>]) -> Vec<String> {

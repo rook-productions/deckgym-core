@@ -22,3 +22,5 @@ mod on_evolve_ability_test;
 mod retreat_cost_abilities_test;
 #[path = "mechanics/retreat_test.rs"]
 mod retreat_test;
+#[path = "mechanics/static_passive_ability_test.rs"]
+mod static_passive_ability_test;

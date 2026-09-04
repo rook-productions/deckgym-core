@@ -254,6 +254,33 @@ pub enum AbilityMechanic {
     CoinFlipSleepOpponentActive,
     DiscardFromHandToDrawCard,
     ImmuneToStatusConditions,
+    /// Hoothoot's Insomnia: "This Pokémon can't be Asleep." Enforced in
+    /// `State::apply_status_condition`.
+    ImmuneToStatusCondition {
+        condition: StatusCondition,
+    },
+    /// Cherubi's En-fruits-iastic: "If this Pokémon has a Pokémon Tool attached, attacks used by
+    /// this Pokémon cost `amount` less [`energy_type`] Energy." Resolved in
+    /// `hooks::get_attack_cost`.
+    ReduceTypedAttackCostIfHasTool {
+        energy_type: EnergyType,
+        amount: u8,
+    },
+    /// Lilligant's Toughness Aroma: "Each of your [`energy_type`] Pokémon gets +`amount` HP."
+    /// Board-dependent, so it is cached on each `PlayedCard` (like the Stadium HP bonus) and
+    /// refreshed whenever the owner's board changes.
+    IncreaseHpOfYourTypedPokemon {
+        energy_type: EnergyType,
+        amount: u32,
+    },
+    /// Claydol's Heal Block: "Pokémon (both yours and your opponent's) can't be healed." Cached on
+    /// each `PlayedCard` and consulted by `PlayedCard::heal`.
+    NoHealingForAnyone,
+    /// Regigigas's Seal of Antiquity: "If you don't have <names> on your Bench, this Pokémon can't
+    /// attack." Enforced in attack move generation.
+    CannotAttackUnlessNamedOnBench {
+        names: Vec<String>,
+    },
     /// Passive ability shared by Teal Mask Ogerpon ex (Soothing Wind) and Comfey (Flower Shield):
     /// Each of your Pokémon that has the required Energy attached recovers from all Special
     /// Conditions and can't be affected by any Special Conditions.

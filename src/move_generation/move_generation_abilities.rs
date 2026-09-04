@@ -202,6 +202,11 @@ fn can_use_ability_by_mechanic(
             !card.ability_used && !state.hands[state.current_player].is_empty()
         }
         AbilityMechanic::ImmuneToStatusConditions => false, // Passive ability
+        AbilityMechanic::ImmuneToStatusCondition { .. } => false, // Passive ability
+        AbilityMechanic::ReduceTypedAttackCostIfHasTool { .. } => false, // Passive ability
+        AbilityMechanic::IncreaseHpOfYourTypedPokemon { .. } => false, // Passive ability
+        AbilityMechanic::NoHealingForAnyone => false,       // Passive ability
+        AbilityMechanic::CannotAttackUnlessNamedOnBench { .. } => false, // Passive ability
         AbilityMechanic::SoothingWind { .. } => false,      // Passive ability
         AbilityMechanic::NoOpponentSupportInActive => false,
         AbilityMechanic::NoOpponentStadiumInActive => false, // Passive ability
