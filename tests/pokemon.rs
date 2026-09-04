@@ -108,6 +108,8 @@ mod flutter_mane_ex_test;
 mod flygon_ex_test;
 #[path = "pokemon/gallade_test.rs"]
 mod gallade_test;
+#[path = "pokemon/game_state_attacks_d_test.rs"]
+mod game_state_attacks_d_test;
 #[path = "pokemon/gardevoir_psy_turbo_test.rs"]
 mod gardevoir_psy_turbo_test;
 #[path = "pokemon/gigalith_ex_megaton_cannon_test.rs"]

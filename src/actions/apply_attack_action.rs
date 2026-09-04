@@ -1111,7 +1111,51 @@ fn forecast_effect_attack_by_mechanic(
             *energy_type,
             *damage_per,
         ),
+        Mechanic::ExtraDamagePerOwnKnockoutThisGame { damage_per } => {
+            extra_damage_per_own_knockout_this_game(state, attack.fixed_damage, *damage_per)
+        }
+        Mechanic::ExtraDamagePerOpponentPointLastTurn { damage_per } => {
+            extra_damage_per_opponent_point_last_turn(state, attack.fixed_damage, *damage_per)
+        }
+        Mechanic::InflictPoisonWithDamage { poison_damage } => {
+            inflict_poison_with_damage(attack.fixed_damage, *poison_damage)
+        }
+        Mechanic::RequireBenchedNamesThenDiscardAllEnergy { .. } => {
+            damage_and_discard_all_energy(attack.fixed_damage)
+        }
     }
+}
+
+/// Kingambit - Overlord's Blade: `damage_per` more damage for each of the attacker's own Pokémon
+/// that has been Knocked Out this game.
+fn extra_damage_per_own_knockout_this_game(
+    state: &State,
+    base: u32,
+    damage_per: u32,
+) -> AttackOutcomes {
+    let knockouts = state.count_own_knockouts(state.current_player);
+    active_damage_doutcome(base + knockouts * damage_per)
+}
+
+/// Hisuian Basculegion - Soul Counter: `damage_per` more damage for each point the opponent scored
+/// during their own previous turn.
+fn extra_damage_per_opponent_point_last_turn(
+    state: &State,
+    base: u32,
+    damage_per: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let points = state.points_gained_during_last_turn(opponent);
+    active_damage_doutcome(base + points * damage_per)
+}
+
+/// Toxicroak - Toxic / Toxapex - Severe Poison: Poison the opponent's Active Pokémon, with Checkup
+/// dealing `poison_damage` instead of the usual 10.
+fn inflict_poison_with_damage(damage: u32, poison_damage: u32) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |_, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        state.apply_poison_with_damage(opponent, 0, poison_damage);
+    })
 }
 
 /// Tapu Koko - Volt Switch: like `switch_self_with_bench`, but only Benched Pokémon of

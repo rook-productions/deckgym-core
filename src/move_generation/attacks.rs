@@ -1,5 +1,8 @@
 use crate::{
-    actions::{abilities::AbilityMechanic, has_ability_mechanic, SimpleAction},
+    actions::{
+        abilities::AbilityMechanic, has_ability_mechanic, Mechanic, SimpleAction,
+        EFFECT_MECHANIC_MAP,
+    },
     effects::CardEffect,
     hooks::{contains_energy, get_attack_cost},
     models::{Attack, PlayedCard},
@@ -48,6 +51,9 @@ pub(crate) fn generate_attack_actions(state: &State) -> Vec<SimpleAction> {
             if restricted_attack_names.contains(&attack.title) {
                 continue;
             }
+            if !attack_precondition_met(state, current_player, &attack) {
+                continue;
+            }
             let modified_cost = get_attack_cost(&attack.energy_required, state, current_player);
             if contains_energy(active_pokemon, &modified_cost, state, current_player) {
                 offered.push(attack.clone());
@@ -56,6 +62,27 @@ pub(crate) fn generate_attack_actions(state: &State) -> Vec<SimpleAction> {
         }
     }
     actions
+}
+
+/// Whether an attack whose effect text carries a "You can use this attack only if ..." clause has
+/// that condition met. Attacks without such a clause are always usable (subject to the ordinary
+/// Energy cost and effect restrictions checked by the caller).
+fn attack_precondition_met(state: &State, player: usize, attack: &Attack) -> bool {
+    let Some(effect) = attack.effect.as_deref() else {
+        return true;
+    };
+    match EFFECT_MECHANIC_MAP.get(effect) {
+        // Mesprit's Supreme Blast: "You can use this attack only if you have Uxie and Azelf on
+        // your Bench."
+        Some(Mechanic::RequireBenchedNamesThenDiscardAllEnergy {
+            required_bench_names,
+        }) => required_bench_names.iter().all(|name| {
+            state
+                .enumerate_bench_pokemon(player)
+                .any(|(_, pokemon)| pokemon.get_name() == *name)
+        }),
+        _ => true,
+    }
 }
 
 /// Celebi's Time Recall: while a Pokémon with the ability is in play, each of your evolved

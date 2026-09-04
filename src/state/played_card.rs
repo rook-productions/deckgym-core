@@ -35,6 +35,12 @@ pub struct PlayedCard {
     pub moved_to_active_this_turn: bool,
     pub ability_used: bool,
     poisoned: bool,
+    /// Checkup damage this Pokemon takes from its current Poison, when an attack replaced the usual
+    /// amount ("Do 20 damage to this Pokemon instead of the usual amount for this Special
+    /// Condition." — Toxicroak's Toxic, Toxapex's Severe Poison). Cleared whenever the Poison is
+    /// cleared or re-applied normally, so a later ordinary Poison is back to 10.
+    #[serde(default)]
+    poison_damage_override: Option<u32>,
     paralyzed: bool,
     asleep: bool,
     burned: bool,
@@ -70,6 +76,7 @@ impl PlayedCard {
             attached_tool: None,
             ability_used: false,
             poisoned: false,
+            poison_damage_override: None,
             paralyzed: false,
             asleep: false,
             burned: false,
@@ -275,6 +282,18 @@ impl PlayedCard {
         self.poisoned
     }
 
+    /// Replaces the Checkup damage of this Pokemon's current Poison. Set right after the Poison
+    /// lands; `set_status_raw(Poisoned)` and every cure path reset it.
+    pub(crate) fn set_poison_damage_override(&mut self, amount: u32) {
+        self.poison_damage_override = Some(amount);
+    }
+
+    /// The Checkup damage this Pokemon's Poison deals before any board-wide bonus, i.e. the usual
+    /// 10 unless an attack overrode it.
+    pub(crate) fn poison_base_damage(&self) -> u32 {
+        self.poison_damage_override.unwrap_or(10)
+    }
+
     pub fn is_paralyzed(&self) -> bool {
         self.paralyzed
     }
@@ -351,6 +370,7 @@ impl PlayedCard {
 
     pub(crate) fn clear_status_and_effects(&mut self) {
         self.poisoned = false;
+        self.poison_damage_override = None;
         self.paralyzed = false;
         self.asleep = false;
         self.burned = false;
@@ -360,6 +380,7 @@ impl PlayedCard {
 
     pub(crate) fn cure_status_conditions(&mut self) {
         self.poisoned = false;
+        self.poison_damage_override = None;
         self.paralyzed = false;
         self.asleep = false;
         self.burned = false;
@@ -368,7 +389,10 @@ impl PlayedCard {
 
     pub(crate) fn clear_status_condition(&mut self, status: StatusCondition) {
         match status {
-            StatusCondition::Poisoned => self.poisoned = false,
+            StatusCondition::Poisoned => {
+                self.poisoned = false;
+                self.poison_damage_override = None;
+            }
             StatusCondition::Paralyzed => self.paralyzed = false,
             StatusCondition::Asleep => self.asleep = false,
             StatusCondition::Burned => self.burned = false,
@@ -381,7 +405,11 @@ impl PlayedCard {
         match status {
             StatusCondition::Asleep => self.asleep = true,
             StatusCondition::Paralyzed => self.paralyzed = true,
-            StatusCondition::Poisoned => self.poisoned = true,
+            StatusCondition::Poisoned => {
+                self.poisoned = true;
+                // An ordinary Poison replaces any earlier custom-damage Poison.
+                self.poison_damage_override = None;
+            }
             StatusCondition::Burned => self.burned = true,
             StatusCondition::Confused => self.confused = true,
         }

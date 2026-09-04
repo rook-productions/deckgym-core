@@ -156,7 +156,11 @@ fn start_turn_ability_outcomes(state: &State, player: usize) -> (Probabilities, 
 fn get_poison_damage(state: &State, player: usize, in_play_idx: usize) -> u32 {
     use crate::actions::{abilities::AbilityMechanic, get_ability_mechanic};
 
-    let base_damage = 10;
+    // Usually 10, unless the attack that inflicted the Poison replaced that amount
+    // (Toxicroak's Toxic does 20, Toxapex's Severe Poison does 40).
+    let base_damage = state.in_play_pokemon[player][in_play_idx]
+        .as_ref()
+        .map_or(10, |pokemon| pokemon.poison_base_damage());
 
     // Nihilego's More Poison ability only affects the active Pokemon
     if in_play_idx != 0 {
@@ -712,6 +716,10 @@ pub(crate) fn handle_knockouts(
                 .and_then(|pokemon| pokemon.get_energy_type());
             state.record_knocked_out_by_opponent_attack(ko_pokemon_type);
         }
+
+        // Every knockout counts against the player who lost the Pokemon, however it happened
+        // (Kingambit's Overlord's Blade counts self-inflicted and Checkup knockouts too).
+        state.record_own_knockout(ko_receiver);
 
         state.discard_from_play(ko_receiver, ko_pokemon_idx);
     }

@@ -812,4 +812,25 @@ pub enum Mechanic {
         energy_type: EnergyType,
         damage_per: u32,
     },
+    /// Kingambit's Overlord's Blade: `damage_per` more damage for each time one of the attacker's
+    /// own Pokémon has been Knocked Out during this game.
+    ExtraDamagePerOwnKnockoutThisGame {
+        damage_per: u32,
+    },
+    /// Hisuian Basculegion's Soul Counter: `damage_per` more damage for each point the opponent
+    /// scored during their own previous turn.
+    ExtraDamagePerOpponentPointLastTurn {
+        damage_per: u32,
+    },
+    /// Toxicroak's Toxic / Toxapex's Severe Poison: Poison the opponent's Active Pokémon, but its
+    /// Checkup damage is `poison_damage` instead of the usual 10.
+    InflictPoisonWithDamage {
+        poison_damage: u32,
+    },
+    /// Mesprit's Supreme Blast: usable only while every Pokémon named in `required_bench_names` is
+    /// on the attacker's Bench; on use, all Energy is discarded from the attacking Pokémon. The
+    /// usability half is enforced in `move_generation::attacks`, which consults this variant.
+    RequireBenchedNamesThenDiscardAllEnergy {
+        required_bench_names: Vec<String>,
+    },
 }

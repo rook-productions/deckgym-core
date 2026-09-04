@@ -1944,7 +1944,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             coin_flip: false,
         },
     );
-    // map.insert("You can use this attack only if you have Uxie and Azelf on your Bench. Discard all Energy from this Pokémon.", todo_implementation);
+    // Mesprit - Supreme Blast
+    map.insert(
+        "You can use this attack only if you have Uxie and Azelf on your Bench. Discard all Energy from this Pokémon.",
+        Mechanic::RequireBenchedNamesThenDiscardAllEnergy {
+            required_bench_names: vec!["Uxie".to_string(), "Azelf".to_string()],
+        },
+    );
     // Gyarados - Wild Swing
     map.insert(
         "You may discard any number of your Benched [W] Pokémon. This attack does 40 more damage for each Benched Pokémon you discarded in this way.",
@@ -2028,7 +2034,11 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Discard a random Energy from among the Energy attached to all Pokémon (both yours and your opponent's).",
         Mechanic::DiscardRandomGlobalEnergy { count: 1 },
     );
-    // map.insert("Your opponent's Active Pokémon is now Poisoned. Do 20 damage to this Pokémon instead of the usual amount for this Special Condition.", todo_implementation);
+    // Toxicroak - Toxic
+    map.insert(
+        "Your opponent's Active Pokémon is now Poisoned. Do 20 damage to this Pokémon instead of the usual amount for this Special Condition.",
+        Mechanic::InflictPoisonWithDamage { poison_damage: 20 },
+    );
     map.insert(
         "If this Pokémon has at least 2 extra [W] Energy attached, this attack also does 50 damage to 1 of your opponent's Benched Pokémon.",
         Mechanic::ConditionalBenchDamage {
@@ -2834,6 +2844,21 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         Mechanic::InflictStatusConditionsAndShuffleSelfIntoDeck {
             conditions: vec![StatusCondition::Poisoned, StatusCondition::Paralyzed],
         },
+    );
+    // Toxapex - Severe Poison
+    map.insert(
+        "Your opponent's Active Pokémon is now Poisoned. Do 40 damage to this Pokémon instead of the usual amount for this Special Condition.",
+        Mechanic::InflictPoisonWithDamage { poison_damage: 40 },
+    );
+    // Kingambit - Overlord's Blade
+    map.insert(
+        "This attack does 40 more damage for each time your Pokémon have been Knocked Out during this game.",
+        Mechanic::ExtraDamagePerOwnKnockoutThisGame { damage_per: 40 },
+    );
+    // Hisuian Basculegion - Soul Counter
+    map.insert(
+        "This attack does 50 more damage for each point your opponent got during their last turn.",
+        Mechanic::ExtraDamagePerOpponentPointLastTurn { damage_per: 50 },
     );
     map
 });
