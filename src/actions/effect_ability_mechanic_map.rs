@@ -268,6 +268,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             },
         );
         map.insert(
+            "This Pokémon may have up to 2 Pokémon Tool cards attached to it.",
+            AbilityMechanic::ExtraToolSlots { amount: 1 },
+        );
+        map.insert(
             "Once during your turn, if this Pokémon is on your Bench, you may discard all Pokémon Tools from your opponent's Active Pokémon. If you do, discard this Pokémon.",
             AbilityMechanic::DiscardOpponentActiveToolsAndDiscardSelf,
         );
