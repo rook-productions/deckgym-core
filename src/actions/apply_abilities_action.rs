@@ -6,17 +6,23 @@ use rand::{rngs::StdRng, Rng};
 use crate::{
     actions::{
         abilities::AbilityMechanic,
-        apply_action_helpers::{apply_activate, handle_damage, handle_knockouts, Mutation},
+        apply_action_helpers::{
+            apply_activate, handle_damage, handle_knockouts, Mutation, Mutations,
+        },
         effect_ability_mechanic_map::ability_mechanic_from_effect,
         outcomes::Outcomes,
         shared_mutations::{pokemon_search_outcomes, tool_search_outcomes},
         Action, SimpleAction,
     },
-    effects::TurnEffect,
+    combinatorics::generate_combinations,
+    effects::{CardEffect, TurnEffect},
     hooks::is_ultra_beast,
-    models::{Card, EnergyType, PlayedCard, StatusCondition},
+    models::{Card, EnergyType, PlayedCard, StatusCondition, TrainerType},
     State,
 };
+
+/// Points needed to win a game of Pokémon TCG Pocket.
+const POINTS_TO_WIN: u8 = 3;
 
 // This is a reducer of all actions relating to abilities.
 pub(crate) fn forecast_ability(state: &State, action: &Action, in_play_idx: usize) -> Outcomes {
@@ -298,6 +304,22 @@ fn forecast_ability_by_mechanic(
         AbilityMechanic::MoveRandomEnergyFromOpponentActiveToSelfOnEvolve => {
             panic!("MoveRandomEnergyFromOpponentActiveToSelfOnEvolve is triggered on evolve")
         }
+        AbilityMechanic::PutRandomToolsFromDiscardToHandOnEvolve { amount } => {
+            put_random_tools_from_discard_to_hand(action.actor, state, *amount)
+        }
+        AbilityMechanic::TakeItemsFromTopOfDeckOnEvolve { amount } => {
+            take_items_from_top_of_deck(*amount)
+        }
+        AbilityMechanic::PutSupporterFromDiscardToHandOnEvolve => {
+            put_supporter_from_discard_to_hand()
+        }
+        AbilityMechanic::OpponentShuffleHandAndDrawPerRemainingPointOnEvolve => {
+            opponent_shuffle_hand_and_draw_per_remaining_point()
+        }
+        AbilityMechanic::PreventAllDamageAndEffectsOnEvolve => {
+            prevent_all_damage_and_effects_on_self(in_play_idx)
+        }
+        AbilityMechanic::HealActiveTypedOnBench { amount, .. } => heal_active_your_pokemon(*amount),
         AbilityMechanic::CanEvolveIntoEeveeEvolution => {
             panic!("CanEvolveIntoEeveeEvolution is a passive ability")
         }
@@ -700,6 +722,107 @@ fn coin_flip_sleep_opponent_active() -> Outcomes {
         }),
         Box::new(|_, _, _| {}),
     )
+}
+
+/// Galarian Perrserker's Dig Up: put `amount` random Pokémon Tool cards from the discard pile
+/// into hand. Every unordered combination of that size is its own equally likely branch, so the
+/// randomness is visible in the forecast (cf. `card_search_outcomes_with_filter_multiple`).
+fn put_random_tools_from_discard_to_hand(actor: usize, state: &State, amount: usize) -> Outcomes {
+    let tools: Vec<Card> = state.discard_piles[actor]
+        .iter()
+        .filter(|card| {
+            matches!(card, Card::Trainer(trainer) if trainer.trainer_card_type == TrainerType::Tool)
+        })
+        .cloned()
+        .collect();
+    if tools.is_empty() {
+        return Outcomes::single_fn(|_, _, _| {});
+    }
+
+    let combinations = generate_combinations(&tools, amount.min(tools.len()));
+    let probabilities = vec![1.0 / combinations.len() as f64; combinations.len()];
+    let mutations: Mutations = combinations
+        .into_iter()
+        .map(|combo| -> Mutation {
+            Box::new(move |_, state, action| {
+                for card in &combo {
+                    if let Some(idx) = state.discard_piles[action.actor]
+                        .iter()
+                        .position(|c| c == card)
+                    {
+                        state.discard_piles[action.actor].remove(idx);
+                        state.hands[action.actor].push(card.clone());
+                    }
+                }
+            })
+        })
+        .collect();
+    Outcomes::from_parts(probabilities, mutations)
+}
+
+/// Raticate's Treasure Collecting: look at the top `amount` cards of the deck, keep every Item
+/// card and shuffle the rest back in.
+fn take_items_from_top_of_deck(amount: usize) -> Outcomes {
+    Outcomes::single_fn(move |rng, state, action| {
+        let deck = &mut state.decks[action.actor];
+        let take = amount.min(deck.cards.len());
+        let looked_at: Vec<Card> = deck.cards.drain(..take).collect();
+        let mut put_back = Vec::new();
+        for card in looked_at {
+            match &card {
+                Card::Trainer(trainer) if trainer.trainer_card_type == TrainerType::Item => {
+                    state.hands[action.actor].push(card)
+                }
+                _ => put_back.push(card),
+            }
+        }
+        state.decks[action.actor].cards.extend(put_back);
+        state.decks[action.actor].shuffle(false, rng);
+    })
+}
+
+/// Delcatty's Search for Friends: the player picks which Supporter comes back from the discard
+/// pile, so each distinct candidate becomes a choice on the move-generation stack.
+fn put_supporter_from_discard_to_hand() -> Outcomes {
+    Outcomes::single_fn(|_rng, state, action| {
+        let mut seen = std::collections::HashSet::new();
+        let choices: Vec<SimpleAction> = state.discard_piles[action.actor]
+            .iter()
+            .filter(|card| {
+                matches!(card, Card::Trainer(trainer) if trainer.trainer_card_type == TrainerType::Supporter)
+            })
+            .filter(|card| seen.insert((*card).clone()))
+            .map(|card| SimpleAction::PutDiscardCardInHand { card: card.clone() })
+            .collect();
+        if !choices.is_empty() {
+            state.move_generation_stack.push((action.actor, choices));
+        }
+    })
+}
+
+/// Polteageist's Refreshing Tea: the opponent shuffles their hand into their deck, then draws one
+/// card for each point they still need to win (3 points wins a game of Pocket).
+fn opponent_shuffle_hand_and_draw_per_remaining_point() -> Outcomes {
+    Outcomes::single_fn(|rng, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        let hand: Vec<Card> = std::mem::take(&mut state.hands[opponent]);
+        state.decks[opponent].cards.extend(hand);
+        state.decks[opponent].shuffle(false, rng);
+        let remaining_points = POINTS_TO_WIN.saturating_sub(state.points[opponent]);
+        for _ in 0..remaining_points {
+            state.maybe_draw_card(opponent);
+        }
+    })
+}
+
+/// Samurott's Stance: prevent all damage from — and effects of — attacks done to this Pokémon
+/// until the end of the opponent's next turn.
+fn prevent_all_damage_and_effects_on_self(in_play_idx: usize) -> Outcomes {
+    Outcomes::single_fn(move |_rng, state, action| {
+        if let Some(pokemon) = state.in_play_pokemon[action.actor][in_play_idx].as_mut() {
+            pokemon.add_effect(CardEffect::PreventAllDamageAndEffects, 1);
+        }
+    })
 }
 
 fn coin_flip_poison_opponent_active() -> Outcomes {

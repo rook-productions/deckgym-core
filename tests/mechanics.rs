@@ -16,6 +16,8 @@ mod end_of_turn_knockout_ordering_test;
 mod hoopa_ex_deceptive_needle_quick_growth_test;
 #[path = "mechanics/knockout_retaliation_test.rs"]
 mod knockout_retaliation_test;
+#[path = "mechanics/on_evolve_ability_test.rs"]
+mod on_evolve_ability_test;
 #[path = "mechanics/retreat_cost_abilities_test.rs"]
 mod retreat_cost_abilities_test;
 #[path = "mechanics/retreat_test.rs"]

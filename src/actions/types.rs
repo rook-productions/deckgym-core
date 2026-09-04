@@ -110,6 +110,11 @@ pub enum SimpleAction {
     DiscardOpponentSupporter {
         supporter_card: Card,
     },
+    /// Delcatty's Search for Friends: put a specific card from your own discard pile into your
+    /// hand. One action per eligible card, so the player picks which one.
+    PutDiscardCardInHand {
+        card: Card,
+    },
     /// Discard multiple specific cards from own hand
     DiscardOwnCards {
         cards: Vec<Card>,
@@ -304,6 +309,9 @@ impl fmt::Display for SimpleAction {
             }
             SimpleAction::DiscardOpponentSupporter { supporter_card } => {
                 write!(f, "DiscardOpponentSupporter({supporter_card})")
+            }
+            SimpleAction::PutDiscardCardInHand { card } => {
+                write!(f, "PutDiscardCardInHand({card})")
             }
             SimpleAction::DiscardOwnCards { cards } => {
                 write!(f, "DiscardOwnCards({:?})", cards)

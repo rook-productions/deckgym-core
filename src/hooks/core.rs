@@ -186,7 +186,12 @@ pub(crate) fn on_evolve(
                 ],
             ));
         }
-        Some(AbilityMechanic::CoinFlipParalyzeOpponentActiveOnEvolve) => {
+        Some(AbilityMechanic::CoinFlipParalyzeOpponentActiveOnEvolve)
+        | Some(AbilityMechanic::PutRandomToolsFromDiscardToHandOnEvolve { .. })
+        | Some(AbilityMechanic::TakeItemsFromTopOfDeckOnEvolve { .. })
+        | Some(AbilityMechanic::PutSupporterFromDiscardToHandOnEvolve)
+        | Some(AbilityMechanic::OpponentShuffleHandAndDrawPerRemainingPointOnEvolve)
+        | Some(AbilityMechanic::PreventAllDamageAndEffectsOnEvolve) => {
             offer_on_evolve_ability(actor, state, in_play_idx);
         }
         Some(AbilityMechanic::DiscardRandomEnergyFromOpponentActiveOnEvolve) => {
@@ -253,6 +258,24 @@ pub(crate) fn on_bench_from_hand(actor: usize, state: &mut State, card: &Card, b
                 return;
             }
             debug!("Legendary Drive: offering switch to active");
+            state.move_generation_stack.push((
+                actor,
+                vec![
+                    SimpleAction::UseAbility {
+                        in_play_idx: bench_idx,
+                    },
+                    SimpleAction::Noop,
+                ],
+            ));
+        }
+        Some(AbilityMechanic::HealActiveTypedOnBench { energy_type, .. }) => {
+            let heals_anyone = state.maybe_get_active(actor).is_some_and(|active| {
+                active.is_damaged() && active.get_energy_type() == Some(*energy_type)
+            });
+            if !heals_anyone {
+                return;
+            }
+            debug!("Hospitality: offering to heal the Active Pokemon");
             state.move_generation_stack.push((
                 actor,
                 vec![

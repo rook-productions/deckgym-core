@@ -236,6 +236,9 @@ pub fn forecast_action(state: &State, action: &Action) -> Outcomes {
             forecast_discard_opponent_supporter(action.actor, supporter_card)
         }
         SimpleAction::DiscardOwnCards { cards } => forecast_discard_own_cards(action.actor, cards),
+        SimpleAction::PutDiscardCardInHand { card } => {
+            forecast_put_discard_card_in_hand(action.actor, card)
+        }
         SimpleAction::BenchOpponentPokemonFromHand { cards } => {
             forecast_bench_opponent_pokemon_from_hand(action.actor, cards)
         }
@@ -990,6 +993,21 @@ fn forecast_discard_own_cards(acting_player: usize, cards: &[Card]) -> Outcomes 
             state.discard_card_from_hand(acting_player, card);
         }
         debug!("Discarded {:?} from hand", cards_clone);
+    })
+}
+
+/// Put a chosen card from the acting player's own discard pile into their hand.
+fn forecast_put_discard_card_in_hand(acting_player: usize, card: &Card) -> Outcomes {
+    let card = card.clone();
+    Outcomes::single_fn(move |_rng, state, _action| {
+        if let Some(idx) = state.discard_piles[acting_player]
+            .iter()
+            .position(|c| c == &card)
+        {
+            state.discard_piles[acting_player].remove(idx);
+            state.hands[acting_player].push(card.clone());
+            debug!("Put {card} from the discard pile into hand");
+        }
     })
 }
 

@@ -332,6 +332,34 @@ pub enum AbilityMechanic {
     /// instead of a random one" simplification used elsewhere (e.g.
     /// `DiscardRandomEnergyFromOpponentActiveOnEvolve`).
     MoveRandomEnergyFromOpponentActiveToSelfOnEvolve,
+    /// Galarian Perrserker's Dig Up: "Once during your turn, when you play this Pokémon from your
+    /// hand to evolve 1 of your Pokémon, you may put `amount` random Pokémon Tool cards from your
+    /// discard pile into your hand."
+    PutRandomToolsFromDiscardToHandOnEvolve {
+        amount: usize,
+    },
+    /// Raticate's Treasure Collecting: "…you may look at the top `amount` cards of your deck and
+    /// put all Item cards you find there into your hand. Shuffle the other cards back into your
+    /// deck."
+    TakeItemsFromTopOfDeckOnEvolve {
+        amount: usize,
+    },
+    /// Delcatty's Search for Friends: "…you may put a Supporter card from your discard pile into
+    /// your hand." The player chooses which Supporter.
+    PutSupporterFromDiscardToHandOnEvolve,
+    /// Polteageist's Refreshing Tea: "…you may have your opponent shuffle their hand into their
+    /// deck. For each remaining point that your opponent needs to win, they draw a card."
+    OpponentShuffleHandAndDrawPerRemainingPointOnEvolve,
+    /// Samurott's Stance: "…you may prevent all damage from—and effects of—attacks from your
+    /// opponent's Pokémon done to this Pokémon until the end of your opponent's next turn."
+    PreventAllDamageAndEffectsOnEvolve,
+    /// Poltchageist's Hospitality: "Once during your turn, when you put this Pokémon from your
+    /// hand onto your Bench, you may heal `amount` damage from your Active [`energy_type`]
+    /// Pokémon."
+    HealActiveTypedOnBench {
+        energy_type: EnergyType,
+        amount: u32,
+    },
     CanEvolveIntoEeveeEvolution,
     CanEvolveOnFirstTurnIfActive,
     CounterattackDamage {

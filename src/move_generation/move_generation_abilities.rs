@@ -226,6 +226,13 @@ fn can_use_ability_by_mechanic(
         AbilityMechanic::DiscardRandomEnergyFromOpponentActiveOnEvolve => false,
         AbilityMechanic::PoisonAndBurnOpponentActiveOnEvolve => false,
         AbilityMechanic::MoveRandomEnergyFromOpponentActiveToSelfOnEvolve => false,
+        // Offered by the on-evolve / on-bench hooks, not by free ability move generation.
+        AbilityMechanic::PutRandomToolsFromDiscardToHandOnEvolve { .. } => false,
+        AbilityMechanic::TakeItemsFromTopOfDeckOnEvolve { .. } => false,
+        AbilityMechanic::PutSupporterFromDiscardToHandOnEvolve => false,
+        AbilityMechanic::OpponentShuffleHandAndDrawPerRemainingPointOnEvolve => false,
+        AbilityMechanic::PreventAllDamageAndEffectsOnEvolve => false,
+        AbilityMechanic::HealActiveTypedOnBench { .. } => false,
         AbilityMechanic::CanEvolveIntoEeveeEvolution => false,
         AbilityMechanic::CanEvolveOnFirstTurnIfActive => false,
         AbilityMechanic::CounterattackDamage { .. } => false,
