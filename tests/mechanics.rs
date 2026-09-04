@@ -1,5 +1,7 @@
 #[path = "mechanics/ability_effects_test.rs"]
 mod ability_effects_test;
+#[path = "mechanics/activated_ability_test.rs"]
+mod activated_ability_test;
 #[path = "mechanics/attack_effects_test.rs"]
 mod attack_effects_test;
 #[path = "mechanics/basic_knockout_happy_paths_test.rs"]

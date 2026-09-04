@@ -315,7 +315,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "Once during your turn, if this Pokémon is on your Bench, you may attach an Energy from your discard pile to your Active [N] Pokémon.",
             AbilityMechanic::AttachEnergyFromDiscardToActiveFromBench,
         );
-        // map.insert("Once during your turn, you may choose either player. Look at the top card of that player's deck.", todo_implementation);
+        map.insert(
+            "Once during your turn, you may choose either player. Look at the top card of that player's deck.",
+            AbilityMechanic::LookAtCardsNoop,
+        );
         map.insert(
             "Once during your turn, you may discard the top card of your opponent's deck.",
             AbilityMechanic::DiscardTopCardOpponentDeck,
@@ -324,9 +327,15 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "Once during your turn, you may do 20 damage to 1 of your opponent's Pokémon.",
             AbilityMechanic::DamageOneOpponentPokemon { amount: 20 },
         );
-        // map.insert("Once during your turn, you may flip a coin. If heads, switch in 1 of your opponent's Benched Pokémon to the Active Spot.", todo_implementation);
+        map.insert(
+            "Once during your turn, you may flip a coin. If heads, switch in 1 of your opponent's Benched Pokémon to the Active Spot.",
+            AbilityMechanic::CoinFlipSwitchOpponentBenchToActive,
+        );
         map.insert("Once during your turn, you may flip a coin. If heads, your opponent's Active Pokémon is now Asleep.", AbilityMechanic::CoinFlipSleepOpponentActive);
-        // map.insert("Once during your turn, you may flip a coin. If heads, your opponent's Active Pokémon is now Poisoned.", todo_implementation);
+        map.insert(
+            "Once during your turn, you may flip a coin. If heads, your opponent's Active Pokémon is now Poisoned.",
+            AbilityMechanic::CoinFlipPoisonOpponentActive,
+        );
         map.insert(
             "Once during your turn, you may heal 10 damage from each of your Pokémon.",
             AbilityMechanic::HealAllYourPokemon {
@@ -352,34 +361,53 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
                 energy_type: Some(EnergyType::Water),
             },
         );
-        // map.insert("Once during your turn, you may look at the top card of your deck.", todo_implementation);
+        map.insert(
+            "Once during your turn, you may look at the top card of your deck.",
+            AbilityMechanic::LookAtCardsNoop,
+        );
         map.insert(
             "Once during your turn, you may make your opponent's Active Pokémon Burned.",
             AbilityMechanic::BurnOpponentActive,
         );
-        // map.insert("Once during your turn, you may move all [D] Energy from each of your Pokémon to this Pokémon.", todo_implementation);
+        map.insert(
+            "Once during your turn, you may move all [D] Energy from each of your Pokémon to this Pokémon.",
+            AbilityMechanic::MoveAllTypedEnergyFromAllYourPokemonToSelf {
+                energy_type: EnergyType::Darkness,
+            },
+        );
         map.insert(
             "Once during your turn, you may move all [P] Energy from 1 of your Benched [P] Pokémon to your Active Pokémon.",
             AbilityMechanic::MoveAllTypedEnergyFromBenchToActive {
                 energy_type: EnergyType::Psychic,
             },
         );
-        // map.insert("Once during your turn, you may put a random Pokémon Tool card from your deck into your hand.", todo_implementation);
+        map.insert(
+            "Once during your turn, you may put a random Pokémon Tool card from your deck into your hand.",
+            AbilityMechanic::SearchRandomToolFromDeck,
+        );
         map.insert(
             "Once during your turn, you may put a random Pokémon from your deck into your hand.",
             AbilityMechanic::SearchRandomPokemonFromDeck,
         );
-        // map.insert("Once during your turn, you may switch out your opponent's Active Basic Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.)", todo_implementation);
+        map.insert(
+            "Once during your turn, you may switch out your opponent's Active Basic Pok\u{e9}mon to the Bench.\u{a0}(Your opponent chooses the new Active Pok\u{e9}mon.)",
+            AbilityMechanic::SwitchOutOpponentActiveToBench {
+                require_active: false,
+                require_target_basic: true,
+            },
+        );
         map.insert(
             "Once during your turn, if this Pokémon is in the Active Spot, you may switch out your opponent's Active Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.)",
             AbilityMechanic::SwitchOutOpponentActiveToBench {
                 require_active: true,
+                require_target_basic: false,
             },
         );
         map.insert(
             "Once during your turn, you may switch out your opponent's Active Pok\u{e9}mon to the Bench.\u{a0}(Your opponent chooses the new Active Pok\u{e9}mon.)",
             AbilityMechanic::SwitchOutOpponentActiveToBench {
                 require_active: false,
+                require_target_basic: false,
             },
         );
         map.insert(
@@ -660,6 +688,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
         );
 
         // b4 / b4a mechanics
+        map.insert(
+            "Once during your turn, you may look at a random card from your opponent's hand.",
+            AbilityMechanic::LookAtCardsNoop,
+        );
         map.insert(
             "If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, do 70 damage to the Attacking Pokémon.",
             AbilityMechanic::DamageAttackerOnKnockout { amount: 70 },

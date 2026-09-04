@@ -209,9 +209,33 @@ pub enum AbilityMechanic {
     HealActiveYourPokemon {
         amount: u32,
     },
+    /// "Once during your turn, you may switch out your opponent's Active Pokémon to the Bench."
+    /// `require_active` demands that the ability's holder itself be in the Active Spot;
+    /// `require_target_basic` restricts the ability to an opponent's Active *Basic* Pokémon
+    /// (Swellow's Repelling Wind).
     SwitchOutOpponentActiveToBench {
         require_active: bool,
+        require_target_basic: bool,
     },
+    /// Abilities whose entire effect is looking at hidden cards — Porygon's Data Scan, Unown's
+    /// CHECK, Team Rocket's Kecleon's Spy Ops. deckgym does not model per-player hidden
+    /// information, so using them changes nothing observable; they are implemented as no-ops and
+    /// never offered by move generation (offering them would only pad the search tree).
+    LookAtCardsNoop,
+    /// Grafaiai's Poison Coating: "Once during your turn, you may flip a coin. If heads, your
+    /// opponent's Active Pokémon is now Poisoned."
+    CoinFlipPoisonOpponentActive,
+    /// Rillaboom's Captivating Rhythm: "Once during your turn, you may flip a coin. If heads,
+    /// switch in 1 of your opponent's Benched Pokémon to the Active Spot." (You choose which.)
+    CoinFlipSwitchOpponentBenchToActive,
+    /// Tyranitar's Energy Plunder: "Once during your turn, you may move all [energy_type] Energy
+    /// from each of your Pokémon to this Pokémon."
+    MoveAllTypedEnergyFromAllYourPokemonToSelf {
+        energy_type: EnergyType,
+    },
+    /// Ambipom's Catching Tail: "Once during your turn, you may put a random Pokémon Tool card
+    /// from your deck into your hand."
+    SearchRandomToolFromDeck,
     BadDreamsEndOfTurn {
         amount: u32,
     },

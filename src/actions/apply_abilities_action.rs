@@ -9,7 +9,7 @@ use crate::{
         apply_action_helpers::{apply_activate, handle_damage, handle_knockouts, Mutation},
         effect_ability_mechanic_map::ability_mechanic_from_effect,
         outcomes::Outcomes,
-        shared_mutations::pokemon_search_outcomes,
+        shared_mutations::{pokemon_search_outcomes, tool_search_outcomes},
         Action, SimpleAction,
     },
     effects::TurnEffect,
@@ -222,6 +222,15 @@ fn forecast_ability_by_mechanic(
         AbilityMechanic::SwitchOutOpponentActiveToBench { .. } => {
             switch_out_opponent_active_to_bench()
         }
+        AbilityMechanic::LookAtCardsNoop => Outcomes::single_fn(|_, _, _| {}),
+        AbilityMechanic::CoinFlipPoisonOpponentActive => coin_flip_poison_opponent_active(),
+        AbilityMechanic::CoinFlipSwitchOpponentBenchToActive => {
+            coin_flip_switch_opponent_bench_to_active()
+        }
+        AbilityMechanic::MoveAllTypedEnergyFromAllYourPokemonToSelf { energy_type } => {
+            move_all_typed_energy_to_self(in_play_idx, *energy_type)
+        }
+        AbilityMechanic::SearchRandomToolFromDeck => tool_search_outcomes(action.actor, state),
         AbilityMechanic::CoinFlipSleepOpponentActive => coin_flip_sleep_opponent_active(),
         AbilityMechanic::DiscardFromHandToDrawCard => discard_from_hand_to_draw_card(),
         AbilityMechanic::ImmuneToStatusConditions => {
@@ -691,6 +700,59 @@ fn coin_flip_sleep_opponent_active() -> Outcomes {
         }),
         Box::new(|_, _, _| {}),
     )
+}
+
+fn coin_flip_poison_opponent_active() -> Outcomes {
+    Outcomes::binary_coin(
+        Box::new(|_, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            state.apply_status_condition(opponent, 0, StatusCondition::Poisoned);
+        }),
+        Box::new(|_, _, _| {}),
+    )
+}
+
+/// Rillaboom's Captivating Rhythm: on heads the acting player chooses which of the opponent's
+/// Benched Pokémon is dragged into the Active Spot.
+fn coin_flip_switch_opponent_bench_to_active() -> Outcomes {
+    Outcomes::binary_coin(
+        Box::new(|_, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            let choices = state
+                .enumerate_bench_pokemon(opponent)
+                .map(|(in_play_idx, _)| SimpleAction::Activate {
+                    player: opponent,
+                    in_play_idx,
+                })
+                .collect::<Vec<_>>();
+            if !choices.is_empty() {
+                state.move_generation_stack.push((action.actor, choices));
+            }
+        }),
+        Box::new(|_, _, _| {}),
+    )
+}
+
+/// Tyranitar's Energy Plunder: gather every `energy_type` Energy attached to the acting player's
+/// Pokémon onto the ability's holder.
+fn move_all_typed_energy_to_self(self_idx: usize, energy_type: EnergyType) -> Outcomes {
+    Outcomes::single_fn(move |_rng, state, action| {
+        let mut gathered = 0usize;
+        for (idx, pokemon) in state.in_play_pokemon[action.actor].iter_mut().enumerate() {
+            if idx == self_idx {
+                continue;
+            }
+            let Some(pokemon) = pokemon else { continue };
+            let before = pokemon.attached_energy.len();
+            pokemon.attached_energy.retain(|&e| e != energy_type);
+            gathered += before - pokemon.attached_energy.len();
+        }
+        if let Some(pokemon) = state.in_play_pokemon[action.actor][self_idx].as_mut() {
+            pokemon
+                .attached_energy
+                .extend(std::iter::repeat_n(energy_type, gathered));
+        }
+    })
 }
 
 fn coin_flip_paralyze_opponent_active() -> Outcomes {

@@ -162,11 +162,41 @@ fn can_use_ability_by_mechanic(
             can_use_remove_random_special_condition_from_active(state, card)
         }
         AbilityMechanic::HealActiveYourPokemon { .. } => !card.ability_used,
-        AbilityMechanic::SwitchOutOpponentActiveToBench { require_active } => {
+        AbilityMechanic::SwitchOutOpponentActiveToBench {
+            require_active,
+            require_target_basic,
+        } => {
             let opponent = (state.current_player + 1) % 2;
             !card.ability_used
                 && (!require_active || is_active)
+                && (!require_target_basic
+                    || state
+                        .maybe_get_active(opponent)
+                        .is_some_and(|active| active.card.is_basic()))
                 && state.enumerate_bench_pokemon(opponent).next().is_some()
+        }
+        // Information-only; never offered (see `AbilityMechanic::LookAtCardsNoop`).
+        AbilityMechanic::LookAtCardsNoop => false,
+        // Grafaiai's Poison Coating has no Active-Spot restriction.
+        AbilityMechanic::CoinFlipPoisonOpponentActive => !card.ability_used,
+        AbilityMechanic::CoinFlipSwitchOpponentBenchToActive => {
+            let opponent = (state.current_player + 1) % 2;
+            !card.ability_used && state.enumerate_bench_pokemon(opponent).next().is_some()
+        }
+        AbilityMechanic::MoveAllTypedEnergyFromAllYourPokemonToSelf { energy_type } => {
+            !card.ability_used
+                && state
+                    .enumerate_in_play_pokemon(state.current_player)
+                    .any(|(idx, pokemon)| {
+                        idx != _in_play_index && pokemon.attached_energy.contains(energy_type)
+                    })
+        }
+        AbilityMechanic::SearchRandomToolFromDeck => {
+            !card.ability_used
+                && state.decks[state.current_player].cards.iter().any(|card| {
+                    matches!(card, crate::models::Card::Trainer(trainer)
+                        if trainer.trainer_card_type == crate::models::TrainerType::Tool)
+                })
         }
         AbilityMechanic::DiscardFromHandToDrawCard => {
             !card.ability_used && !state.hands[state.current_player].is_empty()
