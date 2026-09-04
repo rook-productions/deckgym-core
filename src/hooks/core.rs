@@ -123,7 +123,11 @@ pub(crate) fn can_evolve_into(evolution_card: &Card, base_pokemon: &PlayedCard) 
     base_pokemon.card.can_evolve_into(evolution_card)
 }
 
-/// Called when a Pokémon evolves
+/// Called when a Pokémon evolves.
+///
+/// Reads the Ability off the card rather than the board on purpose: `to_card` is by definition an
+/// Evolution (Stage 1 or 2), so Alolan Muk's Power of Alchemy — which only removes the Abilities
+/// of *Basic* Pokémon — can never apply to it.
 pub(crate) fn on_evolve(
     actor: usize,
     state: &mut State,
@@ -255,9 +259,14 @@ fn offer_on_evolve_ability(actor: usize, state: &mut State, in_play_idx: usize) 
     ));
 }
 
-/// Called when a basic Pokémon is placed from hand onto the bench (index > 0).
-pub(crate) fn on_bench_from_hand(actor: usize, state: &mut State, card: &Card, bench_idx: usize) {
-    match get_ability_mechanic(card) {
+/// Called when a basic Pokémon is placed from hand onto the bench (index > 0). The Pokémon is
+/// already in play at `bench_idx`, so its Ability is read off the board: every Pokémon reaching
+/// this hook is a Basic, and Alolan Muk's Power of Alchemy can have removed its Ability.
+pub(crate) fn on_bench_from_hand(actor: usize, state: &mut State, bench_idx: usize) {
+    let mechanic = state.in_play_pokemon[actor][bench_idx]
+        .as_ref()
+        .and_then(|pokemon| pokemon.ability_mechanic());
+    match mechanic {
         Some(AbilityMechanic::LegendaryDrive) => {
             if state.maybe_get_active(actor).is_none() {
                 return;

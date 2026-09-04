@@ -248,6 +248,12 @@ fn forecast_ability_by_mechanic(
             panic!("ImmuneToStatusConditions is a passive ability")
         }
         AbilityMechanic::ExtraToolSlots { .. } => panic!("ExtraToolSlots is a passive ability"),
+        AbilityMechanic::PreventOpponentAttackEffectsOnSelf => {
+            panic!("PreventOpponentAttackEffectsOnSelf is a passive ability")
+        }
+        AbilityMechanic::BasicPokemonHaveNoAbilities => {
+            panic!("BasicPokemonHaveNoAbilities is a passive ability")
+        }
         AbilityMechanic::ReduceTypedAttackCostIfHasTool { .. }
         | AbilityMechanic::IncreaseHpOfYourTypedPokemon { .. }
         | AbilityMechanic::NoHealingForAnyone

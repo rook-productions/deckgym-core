@@ -207,6 +207,8 @@ fn can_use_ability_by_mechanic(
         AbilityMechanic::ImmuneToStatusConditions => false, // Passive ability
         AbilityMechanic::ImmuneToStatusCondition { .. } => false, // Passive ability
         AbilityMechanic::ExtraToolSlots { .. } => false,    // Passive ability
+        AbilityMechanic::PreventOpponentAttackEffectsOnSelf => false, // Passive ability
+        AbilityMechanic::BasicPokemonHaveNoAbilities => false, // Passive ability
         AbilityMechanic::ReduceTypedAttackCostIfHasTool { .. } => false, // Passive ability
         AbilityMechanic::IncreaseHpOfYourTypedPokemon { .. } => false, // Passive ability
         AbilityMechanic::NoHealingForAnyone => false,       // Passive ability
