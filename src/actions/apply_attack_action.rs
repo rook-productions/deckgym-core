@@ -11,7 +11,7 @@ use crate::{
         attack_helpers::{
             collect_in_play_indices_by_type, energy_any_way_choices, generate_distributions,
         },
-        attacks::{BenchSide, CopyAttackSource, Mechanic},
+        attacks::{BenchSide, CopyAttackSource, Mechanic, RevealCriterion},
         effect_ability_mechanic_map::ability_mechanic_from_effect,
         effect_mechanic_map::EFFECT_MECHANIC_MAP,
         Action,
@@ -22,7 +22,9 @@ use crate::{
     hooks::{
         attack_effect_ignores_opponent_active_effects, can_evolve_into, contains_energy,
         get_attack_cost, get_extra_random_spread_hits, get_retreat_cost, get_stage,
+        to_playable_card,
     },
+    models::BASIC_STAGE,
     models::{Attack, Card, EnergyType, StatusCondition, TrainerType},
     tools::has_tool,
     State,
@@ -1031,6 +1033,108 @@ fn forecast_effect_attack_by_mechanic(
             damage_per,
         } => damage_per_own_pokemon_with_attack_name(state, attack_name, *damage_per),
         Mechanic::HealEqualToDamageDealt => heal_equal_to_damage_dealt_attack(attack.fixed_damage),
+        Mechanic::ExtraDamageIfDefenderBurned { extra_damage } => {
+            extra_damage_if_defender_burned(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfDefenderToolAttached { extra_damage } => {
+            extra_damage_if_defender_tool_attached(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfOpponentHpLessThanSelf { extra_damage } => {
+            extra_damage_if_opponent_hp_less_than_self(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfDefenderNameContains {
+            substring,
+            extra_damage,
+        } => extra_damage_if_defender_name_matches(
+            state,
+            attack.fixed_damage,
+            *extra_damage,
+            |name| name.contains(substring.as_str()),
+        ),
+        Mechanic::ExtraDamageIfDefenderNamed { name, extra_damage } => {
+            extra_damage_if_defender_name_matches(state, attack.fixed_damage, *extra_damage, |n| {
+                n == name.as_str()
+            })
+        }
+        Mechanic::ExtraDamageIfDefenderIsBasic { extra_damage } => {
+            extra_damage_if_defender_stage(state, attack.fixed_damage, *extra_damage, true)
+        }
+        Mechanic::ExtraDamageIfDefenderIsEvolution { extra_damage } => {
+            extra_damage_if_defender_stage(state, attack.fixed_damage, *extra_damage, false)
+        }
+        Mechanic::ExtraDamageIfDefenderTypeIn {
+            energy_types,
+            extra_damage,
+        } => extra_damage_if_defender_type_in(
+            state,
+            attack.fixed_damage,
+            energy_types,
+            *extra_damage,
+        ),
+        Mechanic::ExtraDamageIfOpponentHasTypeInPlay {
+            energy_type,
+            extra_damage,
+        } => extra_damage_if_opponent_has_type_in_play(
+            state,
+            attack.fixed_damage,
+            *energy_type,
+            *extra_damage,
+        ),
+        Mechanic::ExtraDamageIfOpponentHandSizeIn {
+            sizes,
+            extra_damage,
+        } => {
+            extra_damage_if_opponent_hand_size_in(state, attack.fixed_damage, sizes, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfOpponentPointsEqual {
+            points,
+            extra_damage,
+        } => extra_damage_if_opponent_points_equal(
+            state,
+            attack.fixed_damage,
+            *points,
+            *extra_damage,
+        ),
+        Mechanic::ExtraDamageIfDifferentEnergyTypesInPlay {
+            minimum_types,
+            extra_damage,
+        } => extra_damage_if_different_energy_types_in_play(
+            state,
+            attack.fixed_damage,
+            *minimum_types,
+            *extra_damage,
+        ),
+        Mechanic::SelfHealIfDefenderPoisoned { amount } => {
+            self_heal_if_defender_poisoned(state, attack.fixed_damage, *amount)
+        }
+        Mechanic::DevolveOpponentActive => devolve_opponent_active(attack.fixed_damage),
+        Mechanic::MoveEnergyToOneBenched { amount } => {
+            move_energy_to_one_benched(state, attack.fixed_damage, *amount)
+        }
+        Mechanic::RandomStatusFromAmong { conditions } => {
+            random_status_from_among(attack.fixed_damage, conditions.clone())
+        }
+        Mechanic::DisableRandomOpponentActiveAttack => {
+            disable_random_opponent_active_attack(attack.fixed_damage)
+        }
+        Mechanic::RandomBenchDamage {
+            times,
+            damage_per_hit,
+        } => random_bench_damage(state, attack.fixed_damage, *times, *damage_per_hit),
+        Mechanic::RandomItemFromDiscardToHand => {
+            random_item_from_discard_to_hand(attack.fixed_damage)
+        }
+        Mechanic::RevealTopDamagePerMatch {
+            count,
+            damage_per_match,
+            criterion,
+        } => reveal_top_damage_per_match(state, *count, *damage_per_match, criterion),
+        Mechanic::ShuffleHandAndDrawPerOpponentHandCard => {
+            shuffle_hand_and_draw_per_opponent_hand_card(attack.fixed_damage)
+        }
+        Mechanic::SwitchOpponentBenchInAndDamage { damage } => {
+            switch_opponent_bench_in_and_damage(state, attack.fixed_damage, *damage)
+        }
     }
 }
 
@@ -1040,12 +1144,19 @@ fn copy_attack(
     require_attacker_energy_match: bool,
 ) -> AttackOutcomes {
     let source = source.clone();
-    active_damage_effect_doutcome(0, move |_, state, action| {
-        let choices =
+    active_damage_effect_doutcome(0, move |rng, state, action| {
+        let mut choices =
             copied_attack_choices(state, action.actor, &source, require_attacker_energy_match);
-        if !choices.is_empty() {
-            state.move_generation_stack.push((action.actor, choices));
+        if choices.is_empty() {
+            return;
         }
+        // Mew's Miraculous Memory picks the attack at random rather than letting the attacking
+        // player choose, so collapse the candidates to a single forced choice here.
+        if source.is_random() {
+            let picked = choices.remove(rng.gen_range(0..choices.len()));
+            choices = vec![picked];
+        }
+        state.move_generation_stack.push((action.actor, choices));
     })
 }
 
@@ -1083,7 +1194,31 @@ fn copied_attack_choices(
                 .map(|(idx, _)| idx),
             require_attacker_energy_match,
         ),
+        CopyAttackSource::OpponentHandAndDeckRandom => copied_attack_choices_from_cards(
+            state.hands[opponent]
+                .iter()
+                .chain(state.decks[opponent].cards.iter()),
+        ),
     }
+}
+
+/// Collects every (non-copy) attack printed on the given cards. Used by Mew's Miraculous Memory,
+/// whose source Pokémon are in the opponent's hand and deck rather than in play, so there is no
+/// board slot (and no attacker Energy check) to reason about.
+fn copied_attack_choices_from_cards<'a, I>(cards: I) -> Vec<SimpleAction>
+where
+    I: IntoIterator<Item = &'a Card>,
+{
+    let mut choices = Vec::new();
+    for card in cards {
+        for attack in card.get_attacks() {
+            if is_copy_attack(&attack) {
+                continue;
+            }
+            choices.push(SimpleAction::Attack(attack));
+        }
+    }
+    choices
 }
 
 fn copied_attack_choices_from_slots<I>(
@@ -3980,8 +4115,313 @@ fn extra_damage_if_defender_asleep(
 
 fn mega_ampharos_lightning_lancer(state: &State) -> AttackOutcomes {
     // 100 to the opponent's Active, plus: 1 of the opponent's Benched Pokémon is chosen at random
-    // 3 times, doing 20 to each chosen Pokémon. The random bench spread is enumerated into
-    // explicit branches so the damage is carried as data.
+    // 3 times, doing 20 to each chosen Pokémon.
+    random_bench_damage(state, 100, 3, 20)
+}
+
+fn extra_damage_if_defender_burned(
+    state: &State,
+    base_damage: u32,
+    extra_damage: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let damage = if state.get_active(opponent).is_burned() {
+        base_damage + extra_damage
+    } else {
+        base_damage
+    };
+    active_damage_doutcome(damage)
+}
+
+/// Rotom's Assault Laser: the mirror of `extra_damage_if_tool_attached`, checking the DEFENDER.
+fn extra_damage_if_defender_tool_attached(
+    state: &State,
+    base_damage: u32,
+    extra_damage: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let damage = if state.get_active(opponent).has_tool_attached() {
+        base_damage + extra_damage
+    } else {
+        base_damage
+    };
+    active_damage_doutcome(damage)
+}
+
+/// Swalot's Swallow Up: the mirror of `extra_damage_if_opponent_hp_more_than_self`.
+fn extra_damage_if_opponent_hp_less_than_self(
+    state: &State,
+    base_damage: u32,
+    extra_damage: u32,
+) -> AttackOutcomes {
+    let attacker = state.get_active(state.current_player);
+    let opponent = state.get_active((state.current_player + 1) % 2);
+    let damage = if opponent.get_remaining_hp() < attacker.get_remaining_hp() {
+        base_damage + extra_damage
+    } else {
+        base_damage
+    };
+    active_damage_doutcome(damage)
+}
+
+/// Shared by Seviper's Fateful Fang (exact name) and Marowak's Punish (name contains "Team
+/// Rocket"): `matches` decides what counts as the right defender.
+fn extra_damage_if_defender_name_matches(
+    state: &State,
+    base_damage: u32,
+    extra_damage: u32,
+    matches: impl Fn(&str) -> bool,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let name = state.get_active(opponent).get_name();
+    let damage = if matches(name.as_str()) {
+        base_damage + extra_damage
+    } else {
+        base_damage
+    };
+    active_damage_doutcome(damage)
+}
+
+/// Stoutland's Dangerous Bite / Araquanid's Dangerous Claws (`want_basic`) and Kangaskhan's
+/// Cross-Cut (`!want_basic`). Fossils count as Basic, per `get_stage`.
+fn extra_damage_if_defender_stage(
+    state: &State,
+    base_damage: u32,
+    extra_damage: u32,
+    want_basic: bool,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let is_basic = get_stage(state.get_active(opponent)) == BASIC_STAGE;
+    let damage = if is_basic == want_basic {
+        base_damage + extra_damage
+    } else {
+        base_damage
+    };
+    active_damage_doutcome(damage)
+}
+
+/// Scovillain's Red-Hot Headbutt: the multi-type sibling of `extra_damage_if_defender_type`.
+fn extra_damage_if_defender_type_in(
+    state: &State,
+    base_damage: u32,
+    energy_types: &[EnergyType],
+    extra_damage: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let defender_type = state.get_active(opponent).card.get_type();
+    let damage = match defender_type {
+        Some(t) if energy_types.contains(&t) => base_damage + extra_damage,
+        _ => base_damage,
+    };
+    active_damage_doutcome(damage)
+}
+
+/// Bronzong's Psychic Resonance: extra damage if the opponent has ANY Pokémon of the type in play.
+fn extra_damage_if_opponent_has_type_in_play(
+    state: &State,
+    base_damage: u32,
+    energy_type: EnergyType,
+    extra_damage: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let damage = if state.num_in_play_of_type(opponent, energy_type) > 0 {
+        base_damage + extra_damage
+    } else {
+        base_damage
+    };
+    active_damage_doutcome(damage)
+}
+
+/// Grumpig's Swaying Dance: extra damage on an exact opponent hand size.
+fn extra_damage_if_opponent_hand_size_in(
+    state: &State,
+    base_damage: u32,
+    sizes: &[usize],
+    extra_damage: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let damage = if sizes.contains(&state.hands[opponent].len()) {
+        base_damage + extra_damage
+    } else {
+        base_damage
+    };
+    active_damage_doutcome(damage)
+}
+
+/// Buzzwole's Ground Beat: extra damage when the opponent's score is exactly `points`.
+fn extra_damage_if_opponent_points_equal(
+    state: &State,
+    base_damage: u32,
+    points: u8,
+    extra_damage: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let damage = if state.points[opponent] == points {
+        base_damage + extra_damage
+    } else {
+        base_damage
+    };
+    active_damage_doutcome(damage)
+}
+
+/// Grafaiai's Colorful Attack: counts distinct Energy types across ALL of the attacker's Pokémon
+/// in play, unlike `extra_damage_if_different_energy_types_attack` which only looks at the active.
+fn extra_damage_if_different_energy_types_in_play(
+    state: &State,
+    base_damage: u32,
+    minimum_types: usize,
+    extra_damage: u32,
+) -> AttackOutcomes {
+    let player = state.current_player;
+    let distinct = state
+        .enumerate_in_play_pokemon(player)
+        .flat_map(|(_, pokemon)| pokemon.get_effective_attached_energy(state, player))
+        .collect::<HashSet<_>>()
+        .len();
+    let damage = if distinct >= minimum_types {
+        base_damage + extra_damage
+    } else {
+        base_damage
+    };
+    active_damage_doutcome(damage)
+}
+
+/// Team Rocket's Muk's Poison Absorption: heal the attacker when the defender is Poisoned.
+/// The condition is read off the pre-attack board, like the other "if the defender is ..." checks.
+fn self_heal_if_defender_poisoned(state: &State, damage: u32, heal: u32) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    if !state.get_active(opponent).is_poisoned() {
+        return active_damage_doutcome(damage);
+    }
+    active_damage_effect_doutcome(damage, move |_, state, action| {
+        state.get_active_mut(action.actor).heal(heal);
+    })
+}
+
+/// Celebi's Temporal Leaves: return the top Evolution card of the opponent's Active Pokémon to
+/// their hand, keeping damage counters, Energy and any attached Tool on the Pokémon underneath.
+fn devolve_opponent_active(damage: u32) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |_, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        let Some(active) = state.in_play_pokemon[opponent][0].as_ref() else {
+            return;
+        };
+        // A Pokémon already Knocked Out by this attack is discarded, not devolved.
+        if active.is_knocked_out() {
+            return;
+        }
+        let Some(previous) = active.cards_behind.last().cloned() else {
+            return; // Not an evolved Pokémon.
+        };
+
+        let evolution_card = active.card.clone();
+        let damage_counters = active.get_damage_counters();
+        let attached_energy = active.attached_energy.clone();
+        let attached_tool = active.attached_tool.clone();
+        let mut cards_behind = active.cards_behind.clone();
+        cards_behind.pop();
+
+        // Like evolving, devolving builds a fresh `PlayedCard`, which clears Special Conditions.
+        let mut devolved = to_playable_card(&previous, false);
+        devolved.cards_behind = cards_behind;
+        devolved.attached_energy = attached_energy;
+        devolved.attached_tool = attached_tool;
+        devolved.apply_damage(damage_counters);
+
+        state.in_play_pokemon[opponent][0] = Some(devolved);
+        state.hands[opponent].push(evolution_card);
+        state.refresh_starting_plains_bonus_for_idx(opponent, 0);
+        state.refresh_double_grass_bonus_for_player(opponent);
+    })
+}
+
+/// Regice's Reflect Energy / Swanna's Feathery Cyclone: the attacker picks which Benched Pokémon
+/// receives the Energy, so the choice goes on the move generation stack.
+fn move_energy_to_one_benched(state: &State, damage: u32, amount: Option<u32>) -> AttackOutcomes {
+    let player = state.current_player;
+    let attached = state.get_active(player).attached_energy.len() as u32;
+    let enough = match amount {
+        None => attached > 0,
+        Some(n) => attached >= n,
+    };
+    if !enough || state.enumerate_bench_pokemon(player).next().is_none() {
+        return active_damage_doutcome(damage);
+    }
+
+    active_damage_effect_doutcome(damage, move |_, state, action| {
+        let choices: Vec<SimpleAction> = state
+            .enumerate_bench_pokemon(action.actor)
+            .map(
+                |(to_in_play_idx, _)| SimpleAction::MoveActiveEnergyToBench {
+                    to_in_play_idx,
+                    amount,
+                },
+            )
+            .collect();
+        if !choices.is_empty() {
+            state.move_generation_stack.push((action.actor, choices));
+        }
+    })
+}
+
+/// Alolan Muk ex's Chemical Panic: pick one Special Condition at random from those not already
+/// affecting the opponent's Active Pokémon.
+fn random_status_from_among(damage: u32, conditions: Vec<StatusCondition>) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |rng, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        let Some(active) = state.in_play_pokemon[opponent][0].as_ref() else {
+            return;
+        };
+        let candidates: Vec<StatusCondition> = conditions
+            .iter()
+            .copied()
+            .filter(|condition| !has_status_condition(active, *condition))
+            .collect();
+        if candidates.is_empty() {
+            return;
+        }
+        let picked = candidates[rng.gen_range(0..candidates.len())];
+        state.apply_status_condition(opponent, 0, picked);
+    })
+}
+
+fn has_status_condition(pokemon: &crate::models::PlayedCard, condition: StatusCondition) -> bool {
+    match condition {
+        StatusCondition::Asleep => pokemon.is_asleep(),
+        StatusCondition::Burned => pokemon.is_burned(),
+        StatusCondition::Confused => pokemon.is_confused(),
+        StatusCondition::Paralyzed => pokemon.is_paralyzed(),
+        StatusCondition::Poisoned => pokemon.is_poisoned(),
+    }
+}
+
+/// Quagsire's Amnesia: lock out one randomly chosen attack of the defender for its next turn.
+fn disable_random_opponent_active_attack(damage: u32) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |rng, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        let Some(active) = state.in_play_pokemon[opponent][0].as_ref() else {
+            return;
+        };
+        let attacks = active.card.get_attacks();
+        if attacks.is_empty() {
+            return;
+        }
+        let attack_name = attacks[rng.gen_range(0..attacks.len())].title.clone();
+        state
+            .get_active_mut(opponent)
+            .add_effect(CardEffect::CannotUseAttack(attack_name), 1);
+    })
+}
+
+/// Ampharos's Zapping Bullet (and, with a bigger spread, Mega Ampharos ex's Lightning Lancer):
+/// `active_damage` to the Defending Pokémon plus `times` random hits spread over the opponent's
+/// Bench. The bench spread is enumerated into explicit branches so the damage stays data.
+fn random_bench_damage(
+    state: &State,
+    active_damage: u32,
+    times: usize,
+    damage_per_hit: u32,
+) -> AttackOutcomes {
     let actor = state.current_player;
     let opponent = (actor + 1) % 2;
     let bench_targets: Vec<(usize, usize)> = state
@@ -3989,10 +4429,10 @@ fn mega_ampharos_lightning_lancer(state: &State) -> AttackOutcomes {
         .map(|(idx, _)| (opponent, idx))
         .collect();
 
-    let bench_outcomes = enumerate_random_damage_outcomes(&bench_targets, 3, 20);
+    let bench_outcomes = enumerate_random_damage_outcomes(&bench_targets, times, damage_per_hit);
     if bench_outcomes.is_empty() {
         // No benched Pokémon to spread to; just hit the active.
-        return active_damage_doutcome(100);
+        return active_damage_doutcome(active_damage);
     }
 
     let (probabilities, attack_outcomes): (Vec<f64>, Vec<AttackOutcome>) = bench_outcomes
@@ -4002,11 +4442,109 @@ fn mega_ampharos_lightning_lancer(state: &State) -> AttackOutcomes {
                 .into_iter()
                 .map(|(player, idx, damage)| (damage, player != actor, idx))
                 .collect();
-            targets.push((100, true, 0)); // Opponent's Active.
+            targets.push((active_damage, true, 0)); // Opponent's Active.
             (prob, AttackOutcome::damage(targets))
         })
         .unzip();
     AttackOutcomes::from_parts(probabilities, attack_outcomes)
+}
+
+/// Team Rocket's Slowpoke's Scavenge.
+fn random_item_from_discard_to_hand(damage: u32) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |rng, state, action| {
+        let item_indices: Vec<usize> = state.discard_piles[action.actor]
+            .iter()
+            .enumerate()
+            .filter(|(_, card)| {
+                matches!(card, Card::Trainer(trainer) if trainer.trainer_card_type == TrainerType::Item)
+            })
+            .map(|(idx, _)| idx)
+            .collect();
+        if item_indices.is_empty() {
+            return;
+        }
+        let picked = item_indices[rng.gen_range(0..item_indices.len())];
+        let card = state.discard_piles[action.actor].remove(picked);
+        state.hands[action.actor].push(card);
+    })
+}
+
+/// Golurk's Heavy Rocket / Team Rocket's Wobbuffet's Rocket Frenzy. The deck order in `State` is
+/// already concrete, so the number of matches among the top cards is known at forecast time; the
+/// effect only has to shuffle them back in.
+fn reveal_top_damage_per_match(
+    state: &State,
+    count: usize,
+    damage_per_match: u32,
+    criterion: &RevealCriterion,
+) -> AttackOutcomes {
+    let player = state.current_player;
+    let matches = state.decks[player]
+        .cards
+        .iter()
+        .take(count)
+        .filter(|card| reveal_criterion_matches(card, criterion))
+        .count() as u32;
+
+    active_damage_effect_doutcome(matches * damage_per_match, move |rng, state, action| {
+        state.decks[action.actor].shuffle(false, rng);
+    })
+}
+
+fn reveal_criterion_matches(card: &Card, criterion: &RevealCriterion) -> bool {
+    match criterion {
+        RevealCriterion::PokemonWithRetreatCostAtLeast(minimum) => matches!(
+            card.get_retreat_cost(),
+            Some(cost) if matches!(card, Card::Pokemon(_)) && cost.len() >= *minimum
+        ),
+        RevealCriterion::PokemonWithNameContaining(substring) => {
+            matches!(card, Card::Pokemon(_)) && card.get_name().contains(substring.as_str())
+        }
+    }
+}
+
+/// Chatot's Mimic / Mime Jr.'s Mime-y Shuffle.
+fn shuffle_hand_and_draw_per_opponent_hand_card(damage: u32) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |rng, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        let to_draw = state.hands[opponent].len();
+        let hand = std::mem::take(&mut state.hands[action.actor]);
+        state.decks[action.actor].cards.extend(hand);
+        state.decks[action.actor].shuffle(false, rng);
+        for _ in 0..to_draw {
+            state.maybe_draw_card(action.actor);
+        }
+    })
+}
+
+/// Sandy Shocks's Pull In and Pound / Team Rocket's Hypno's Entrap: the ATTACKING player picks
+/// which of the opponent's Benched Pokémon gets dragged into the Active Spot (and then takes the
+/// damage), so the choice goes on the attacker's move generation stack.
+fn switch_opponent_bench_in_and_damage(
+    state: &State,
+    fixed_damage: u32,
+    switch_damage: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    if state.enumerate_bench_pokemon(opponent).next().is_none() {
+        return active_damage_doutcome(fixed_damage);
+    }
+
+    active_damage_effect_doutcome(fixed_damage, move |_, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        let choices: Vec<SimpleAction> = state
+            .enumerate_bench_pokemon(opponent)
+            .map(
+                |(in_play_idx, _)| SimpleAction::SwitchOpponentBenchedThenDamage {
+                    in_play_idx,
+                    damage: switch_damage,
+                },
+            )
+            .collect();
+        if !choices.is_empty() {
+            state.move_generation_stack.push((action.actor, choices));
+        }
+    })
 }
 
 fn random_damage_to_opponent_pokemon_per_self_energy(

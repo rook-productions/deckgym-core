@@ -72,6 +72,8 @@ mod croagunk_toxicroak_test;
 mod darkrai_ex_test;
 #[path = "pokemon/dedenne_surskit_test.rs"]
 mod dedenne_surskit_test;
+#[path = "pokemon/defender_condition_damage_test.rs"]
+mod defender_condition_damage_test;
 #[path = "pokemon/delibird_test.rs"]
 mod delibird_test;
 #[path = "pokemon/dragonair_dragons_blessing_test.rs"]
