@@ -28,6 +28,8 @@ mod azurill_spritzee_test;
 mod bellossom_a4_test;
 #[path = "pokemon/blastoise_double_splash_test.rs"]
 mod blastoise_double_splash_test;
+#[path = "pokemon/board_state_conditional_damage_test.rs"]
+mod board_state_conditional_damage_test;
 #[path = "pokemon/bombirdier_test.rs"]
 mod bombirdier_test;
 #[path = "pokemon/bonsly_teary_attack_test.rs"]
