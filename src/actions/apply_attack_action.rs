@@ -1930,12 +1930,17 @@ fn also_choice_bench_damage(
             }
         })
         .collect();
+
+    // "This attack ALSO does X to 1 of ... Benched Pokémon": with no eligible Benched target the
+    // bonus simply fizzles, but the attack's own damage to the Defending Pokémon still happens.
+    if choices.is_empty() {
+        return active_damage_doutcome(active_damage);
+    }
+
     AttackOutcomes::single_effect(move |_, state, action| {
-        if !choices.is_empty() {
-            state
-                .move_generation_stack
-                .push((action.actor, choices.clone()));
-        }
+        state
+            .move_generation_stack
+            .push((action.actor, choices.clone()));
     })
 }
 

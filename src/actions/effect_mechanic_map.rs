@@ -1717,7 +1717,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             damage_per_energy: 20,
         },
     );
-    // map.insert("This attack does 20 more damage for each [G] Energy attached to this Pokémon.", todo_implementation);
+    // Leafeon - Leaf Blast
+    map.insert(
+        "This attack does 20 more damage for each [G] Energy attached to this Pokémon.",
+        Mechanic::ExtraDamagePerSpecificEnergy {
+            energy_type: EnergyType::Grass,
+            damage_per_energy: 20,
+        },
+    );
     map.insert(
         "This attack does 20 more damage for each [P] Energy attached to all of your Pokémon.",
         Mechanic::ExtraDamagePerSpecificEnergyAllYours {
@@ -1825,7 +1832,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             bench_only: false,
         },
     );
-    // map.insert("This attack does 40 more damage for each Energy in your opponent's Active Pokémon's Retreat Cost.", todo_implementation);
+    // Tangrowth - Grass Knot
+    map.insert(
+        "This attack does 40 more damage for each Energy in your opponent's Active Pokémon's Retreat Cost.",
+        Mechanic::ExtraDamagePerRetreatCost {
+            damage_per_energy: 40,
+        },
+    );
     // map.insert("This attack does 40 more damage for each of your Benched Wishiwashi and Wishiwashi ex.", todo_implementation);
     map.insert(
         "This attack does 40 more damage for each of your opponent's Pokémon in play that has an Ability.",
@@ -1886,7 +1899,19 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "This attack's damage isn't affected by any effects on your opponent's Active Pokémon.",
         Mechanic::DamageUnaffectedByOpponentActiveEffects,
     );
-    // map.insert("Until this Pokémon leaves the Active Spot, this Pokémon's Rolling Frenzy attack does +30 damage. This effect stacks.", todo_implementation);
+    // Miltank - Rolling Frenzy
+    map.insert(
+        "Until this Pokémon leaves the Active Spot, this Pokémon's Rolling Frenzy attack does +30 damage. This effect stacks.",
+        Mechanic::DamageAndCardEffect {
+            opponent: false,
+            effect: CardEffect::IncreasedDamageForAttack {
+                attack_name: "Rolling Frenzy".to_string(),
+                amount: 30,
+            },
+            duration: u8::MAX,
+            coin_flip: false,
+        },
+    );
     // map.insert("You can use this attack only if you have Uxie and Azelf on your Bench. Discard all Energy from this Pokémon.", todo_implementation);
     // map.insert("You may discard any number of your Benched [W] Pokémon. This attack does 40 more damage for each Benched Pokémon you discarded in this way.", todo_implementation);
     // map.insert("You may switch this Pokémon with 1 of your Benched Pokémon.", todo_implementation);
@@ -1925,7 +1950,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             target_opponent: true,
         },
     );
-    // map.insert("Your opponent's Active Pokémon is now Poisoned and Burned.", todo_implementation);
+    // Salazzle - Heated Poison / Team Rocket's Houndoom - Toxfire Fang
+    map.insert(
+        "Your opponent's Active Pokémon is now Poisoned and Burned.",
+        Mechanic::InflictStatusConditions {
+            conditions: vec![StatusCondition::Poisoned, StatusCondition::Burned],
+            target_opponent: true,
+        },
+    );
     map.insert(
         "Your opponent's Active Pokémon is now Poisoned and Asleep.",
         Mechanic::InflictStatusConditions {
@@ -2182,7 +2214,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             damage_per_card: 20,
         },
     );
-    // map.insert("This attack does 70 damage to 1 of your opponent's Benched Pokémon.", todo_implementation);
+    // Indeedee - Zen Shard
+    map.insert(
+        "This attack does 70 damage to 1 of your opponent's Benched Pokémon.",
+        Mechanic::DirectDamage {
+            damage: 70,
+            bench_only: true,
+        },
+    );
     map.insert(
         "This attack is used twice in a row. The second attack does 40 damage.(If the first attack Knocks Out your opponent's Active Pokémon, the second attack is used after your opponent chooses a new Active Pokémon.)",
         Mechanic::MegaKangaskhanExDoublePunchingFamily,
@@ -2268,7 +2307,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             target_benched_type: None,
         },
     );
-    // map.insert("This attack also does 50 damage to 1 of your opponent's Benched Pokémon.", todo_implementation);
+    // Palafin - Jet Punch
+    map.insert(
+        "This attack also does 50 damage to 1 of your opponent's Benched Pokémon.",
+        Mechanic::AlsoChoiceBenchDamage {
+            opponent: true,
+            damage: 50,
+        },
+    );
     map.insert(
         "This attack does 20 more damage for each Pokémon in your discard pile.",
         Mechanic::ExtraDamagePerPokemonInDiscard {
@@ -2567,7 +2613,11 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             bench_side: BenchSide::YourBench,
         },
     );
-    // map.insert("This attack does 60 damage to 1 of your opponent's Pokémon that have damage on them.", todo_implementation);
+    // Mandibuzz - Blindside
+    map.insert(
+        "This attack does 60 damage to 1 of your opponent's Pokémon that have damage on them.",
+        Mechanic::DirectDamageIfDamaged { damage: 60 },
+    );
 
     // B3a Mechanics
     map.insert(
@@ -2645,6 +2695,43 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         Mechanic::ExtraDamagePerSpecificEnergy {
             energy_type: EnergyType::Metal,
             damage_per_energy: 10,
+        },
+    );
+    // ---------------------------------------------------------------------------------------
+    // Coverage batch: attacks-d
+    // ---------------------------------------------------------------------------------------
+    // Galarian Obstagoon - Bass Control
+    map.insert(
+        "This attack does 80 damage to 1 of your opponent's Pokémon.",
+        Mechanic::DirectDamage {
+            damage: 80,
+            bench_only: false,
+        },
+    );
+    // Mewtwo - Psychic
+    map.insert(
+        "This attack does 40 more damage for each Energy attached to your opponent's Active Pokémon.",
+        Mechanic::ExtraDamagePerEnergy {
+            include_fixed_damage: true,
+            opponent: true,
+            damage_per_energy: 40,
+        },
+    );
+    // Team Rocket's Arbok - Shadow Seeker
+    map.insert(
+        "This attack does 10 more damage for each Energy in your opponent's Active Pokémon's Retreat Cost.",
+        Mechanic::ExtraDamagePerRetreatCost {
+            damage_per_energy: 10,
+        },
+    );
+    // Team Rocket's Persian - Dangerous Rogue
+    map.insert(
+        "This attack does 40 more damage for each of your opponent's Benched Pokémon.",
+        Mechanic::BenchCountDamage {
+            include_fixed_damage: true,
+            damage_per: 40,
+            energy_type: None,
+            bench_side: BenchSide::OpponentBench,
         },
     );
     map

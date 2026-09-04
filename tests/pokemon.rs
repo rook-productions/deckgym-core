@@ -74,6 +74,8 @@ mod darkrai_ex_test;
 mod dedenne_surskit_test;
 #[path = "pokemon/delibird_test.rs"]
 mod delibird_test;
+#[path = "pokemon/direct_damage_attacks_d_test.rs"]
+mod direct_damage_attacks_d_test;
 #[path = "pokemon/dragonair_dragons_blessing_test.rs"]
 mod dragonair_dragons_blessing_test;
 #[path = "pokemon/drampa_test.rs"]
@@ -220,6 +222,8 @@ mod meowstic_test;
 mod meowth_carefree_steps_test;
 #[path = "pokemon/milotic_ex_aqua_charge_test.rs"]
 mod milotic_ex_aqua_charge_test;
+#[path = "pokemon/miltank_rolling_frenzy_test.rs"]
+mod miltank_rolling_frenzy_test;
 #[path = "pokemon/miraidon_ex_test.rs"]
 mod miraidon_ex_test;
 #[path = "pokemon/morpeko_test.rs"]
@@ -276,6 +280,8 @@ mod salamence_test;
 mod sandslash_fury_swipes_test;
 #[path = "pokemon/sawk_test.rs"]
 mod sawk_test;
+#[path = "pokemon/scaling_damage_attacks_d_test.rs"]
+mod scaling_damage_attacks_d_test;
 #[path = "pokemon/shinx_hide_test.rs"]
 mod shinx_hide_test;
 #[path = "pokemon/silcoon_cascoon_cocoon_collector_test.rs"]
