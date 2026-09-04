@@ -5,8 +5,7 @@ use rand::rngs::StdRng;
 
 use crate::{
     actions::{
-        abilities::AbilityMechanic, ability_mechanic_from_effect,
-        effect_ability_mechanic_map::get_ability_mechanic, shared_mutations, SimpleAction,
+        abilities::AbilityMechanic, ability_mechanic_from_effect, shared_mutations, SimpleAction,
     },
     card_ids::CardId,
     effects::TurnEffect,
@@ -126,7 +125,7 @@ fn start_turn_ability_outcomes(state: &State, player: usize) -> (Probabilities, 
     let Some(active) = state.maybe_get_active(player) else {
         return (vec![1.0], vec![noop_mutation()]);
     };
-    let Some(ability) = active.card.get_ability() else {
+    let Some(ability) = active.ability() else {
         return (vec![1.0], vec![noop_mutation()]);
     };
     let Some(mechanic) = ability_mechanic_from_effect(&ability.effect) else {
@@ -154,7 +153,7 @@ fn start_turn_ability_outcomes(state: &State, player: usize) -> (Probabilities, 
 /// Calculate poison damage based on base damage (10) plus +10 for each opponent's Nihilego with More Poison ability
 /// Only applies the bonus if the poisoned Pokemon is in the active spot (index 0)
 fn get_poison_damage(state: &State, player: usize, in_play_idx: usize) -> u32 {
-    use crate::actions::{abilities::AbilityMechanic, get_ability_mechanic};
+    use crate::actions::abilities::AbilityMechanic;
 
     // Usually 10, unless the attack that inflicted the Poison replaced that amount
     // (Toxicroak's Toxic does 20, Toxapex's Severe Poison does 40).
@@ -172,7 +171,7 @@ fn get_poison_damage(state: &State, player: usize, in_play_idx: usize) -> u32 {
         .enumerate_in_play_pokemon(opponent)
         .filter(|(_, pokemon)| {
             matches!(
-                get_ability_mechanic(&pokemon.card),
+                pokemon.ability_mechanic(),
                 Some(AbilityMechanic::IncreasePoisonDamage { amount: 10 })
             )
         })
@@ -328,14 +327,12 @@ fn apply_checkup_healing_abilities(state: &mut State) {
         .flat_map(|player| {
             state
                 .enumerate_in_play_pokemon(player)
-                .filter_map(
-                    move |(_, pokemon)| match get_ability_mechanic(&pokemon.card) {
-                        Some(AbilityMechanic::HealAllYourPokemonDuringCheckup { amount }) => {
-                            Some((player, *amount))
-                        }
-                        _ => None,
-                    },
-                )
+                .filter_map(move |(_, pokemon)| match pokemon.ability_mechanic() {
+                    Some(AbilityMechanic::HealAllYourPokemonDuringCheckup { amount }) => {
+                        Some((player, *amount))
+                    }
+                    _ => None,
+                })
         })
         .collect();
 
@@ -361,7 +358,7 @@ fn apply_snowy_terrain_checkup_damage(state: &mut State) {
         if active.is_knocked_out() {
             continue;
         }
-        match get_ability_mechanic(&active.card) {
+        match active.ability_mechanic() {
             Some(AbilityMechanic::CheckupDamageToOpponentActive { amount }) => {
                 active_only_damage.push((player, *amount));
             }
@@ -437,9 +434,7 @@ fn checkapply_prevent_first_attack(
     if let Some(target_pokemon) = state.in_play_pokemon[target_player][target_pokemon_idx].as_mut()
     {
         if !target_pokemon.prevent_first_attack_damage_used {
-            if let Some(AbilityMechanic::PreventFirstAttack) =
-                get_ability_mechanic(&target_pokemon.card)
-            {
+            if let Some(AbilityMechanic::PreventFirstAttack) = target_pokemon.ability_mechanic() {
                 debug!("PreventFirstAttackDamageAfterEnteringPlay: Preventing first attack damage");
                 target_pokemon.prevent_first_attack_damage_used = true;
                 return true;
@@ -466,7 +461,7 @@ pub(crate) fn guts_would_flip(
         return false;
     };
     if !matches!(
-        get_ability_mechanic(&pokemon.card),
+        pokemon.ability_mechanic(),
         Some(AbilityMechanic::CoinFlipToSurviveKnockOut)
     ) {
         return false;
@@ -617,7 +612,7 @@ fn apply_bouncy_body(state: &mut State, target_player: usize) {
     let Some(AbilityMechanic::AttachEnergyFromZoneToBenchedOnDamaged { energy_type }) = state
         .in_play_pokemon[target_player][0]
         .as_ref()
-        .and_then(|active| get_ability_mechanic(&active.card))
+        .and_then(|active| active.ability_mechanic())
     else {
         return;
     };

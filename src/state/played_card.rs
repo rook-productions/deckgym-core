@@ -5,7 +5,6 @@ use super::State;
 use crate::{
     actions::{
         abilities::AbilityMechanic, card_effect_from_ability_mechanic, get_ability_mechanic,
-        has_ability_mechanic,
     },
     card_ids::CardId,
     database::get_card_by_enum,
@@ -260,7 +259,7 @@ impl PlayedCard {
         if let Some(AbilityMechanic::IncreaseHpPerAttachedEnergy {
             energy_type,
             amount,
-        }) = get_ability_mechanic(&self.card)
+        }) = self.ability_mechanic()
         {
             let mut matching_count = self
                 .attached_energy
@@ -356,12 +355,45 @@ impl PlayedCard {
     /// are present exactly while the ability-holder is in play (no turn duration).
     pub(crate) fn get_effective_card_effects(&self) -> Vec<CardEffect> {
         let mut effects = self.get_active_effects();
-        if let Some(mechanic) = get_ability_mechanic(&self.card) {
+        if let Some(mechanic) = self.ability_mechanic() {
             if let Some(derived) = card_effect_from_ability_mechanic(mechanic) {
                 effects.push(derived);
             }
         }
         effects
+    }
+
+    /// Whether this Pokémon has been stripped of its Abilities (Budew's Prickly Powder).
+    fn abilities_disabled(&self) -> bool {
+        self.effects
+            .iter()
+            .any(|(effect, _)| matches!(effect, CardEffect::AbilitiesDisabled))
+    }
+
+    /// This Pokémon's Ability as it applies *in play*, i.e. `None` while its Abilities are
+    /// disabled. Every ability lookup that has a `PlayedCard` in hand should go through this
+    /// rather than reaching into `self.card` directly, so "loses all Abilities" is honoured
+    /// uniformly.
+    pub(crate) fn ability(&self) -> Option<crate::models::Ability> {
+        if self.abilities_disabled() {
+            return None;
+        }
+        self.card.get_ability()
+    }
+
+    /// The `AbilityMechanic` this Pokémon contributes in play, or `None` while its Abilities are
+    /// disabled. The in-play counterpart of `get_ability_mechanic(&card)`.
+    pub(crate) fn ability_mechanic(&self) -> Option<&'static AbilityMechanic> {
+        if self.abilities_disabled() {
+            return None;
+        }
+        get_ability_mechanic(&self.card)
+    }
+
+    /// Whether this Pokémon contributes `mechanic` in play. The in-play counterpart of
+    /// `has_ability_mechanic(&card, mechanic)`.
+    pub(crate) fn has_ability(&self, mechanic: &AbilityMechanic) -> bool {
+        self.ability_mechanic() == Some(mechanic)
     }
 
     pub(crate) fn get_effects(&self) -> &Vec<(CardEffect, u8)> {
@@ -484,9 +516,9 @@ impl fmt::Debug for PlayedCard {
 }
 
 pub fn has_serperior_jungle_totem(state: &State, player: usize) -> bool {
-    state.enumerate_in_play_pokemon(player).any(|(_, pokemon)| {
-        has_ability_mechanic(&pokemon.card, &AbilityMechanic::DoubleGrassEnergy)
-    })
+    state
+        .enumerate_in_play_pokemon(player)
+        .any(|(_, pokemon)| pokemon.has_ability(&AbilityMechanic::DoubleGrassEnergy))
 }
 
 #[cfg(test)]

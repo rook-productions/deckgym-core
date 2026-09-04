@@ -15,7 +15,6 @@ use crate::{
             generate_distributions, total_attached_energy,
         },
         attacks::{BenchSide, CopyAttackSource, Mechanic},
-        effect_ability_mechanic_map::ability_mechanic_from_effect,
         effect_mechanic_map::EFFECT_MECHANIC_MAP,
         Action,
     },
@@ -166,9 +165,7 @@ fn apply_defender_guts_if_needed(
         .enumerate_in_play_pokemon(opponent)
         .filter(|(_, pokemon)| {
             pokemon
-                .card
-                .get_ability()
-                .and_then(|a| ability_mechanic_from_effect(&a.effect))
+                .ability_mechanic()
                 .map(|m| matches!(m, AbilityMechanic::CoinFlipToSurviveKnockOut))
                 .unwrap_or(false)
         })
@@ -3572,7 +3569,7 @@ fn extra_damage_if_opponent_active_has_ability(
 ) -> AttackOutcomes {
     let opponent = (state.current_player + 1) % 2;
     let opponent_active = state.get_active(opponent);
-    let has_ability = opponent_active.card.get_ability().is_some();
+    let has_ability = opponent_active.ability().is_some();
     active_damage_doutcome(if has_ability { base + extra } else { base })
 }
 
@@ -3584,7 +3581,7 @@ fn extra_damage_per_opponent_pokemon_with_ability(
     let opponent = (state.current_player + 1) % 2;
     let ability_count = state
         .enumerate_in_play_pokemon(opponent)
-        .filter(|(_, pokemon)| pokemon.card.get_ability().is_some())
+        .filter(|(_, pokemon)| pokemon.ability().is_some())
         .count() as u32;
     active_damage_doutcome(base + damage_per * ability_count)
 }

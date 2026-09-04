@@ -10,7 +10,7 @@ use std::hash::Hash;
 
 use crate::{
     actions::abilities::AbilityMechanic,
-    actions::{has_ability_mechanic, SimpleAction},
+    actions::SimpleAction,
     deck::Deck,
     effects::TurnEffect,
     models::{Attack, Card, EnergyType, StatusCondition},
@@ -399,9 +399,7 @@ impl State {
             return None;
         }
         self.enumerate_in_play_pokemon(player)
-            .find(|(_, pokemon)| {
-                has_ability_mechanic(&pokemon.card, &AbilityMechanic::VictoryStarReflip)
-            })
+            .find(|(_, pokemon)| pokemon.has_ability(&AbilityMechanic::VictoryStarReflip))
             .map(|(idx, _)| idx)
     }
 
@@ -526,7 +524,7 @@ impl State {
             return;
         };
 
-        if has_ability_mechanic(&pokemon.card, &AbilityMechanic::ImmuneToStatusConditions) {
+        if pokemon.has_ability(&AbilityMechanic::ImmuneToStatusConditions) {
             debug!("Fabled Luster: Pokémon is immune to status conditions");
             return;
         }
@@ -543,9 +541,7 @@ impl State {
         // SoothingWind (Ogerpon ex) / Flower Shield (Comfey): if any of this player's Pokémon
         // has the ability, Pokémon meeting the energy requirement are immune to Special Conditions.
         for p in self.in_play_pokemon[player].iter().flatten() {
-            if let Some(AbilityMechanic::SoothingWind { energy_type }) =
-                crate::actions::get_ability_mechanic(&p.card)
-            {
+            if let Some(AbilityMechanic::SoothingWind { energy_type }) = p.ability_mechanic() {
                 let is_protected = match energy_type {
                     None => !pokemon.attached_energy.is_empty(),
                     Some(t) => pokemon.attached_energy.contains(t),

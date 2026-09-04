@@ -2692,7 +2692,17 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             damage_per: 20,
         },
     );
-    // map.insert("The Defending Pokémon loses all Abilities. This effect lasts until the Defending Pokémon leaves the Active Spot.", todo_implementation);
+    // Budew - Prickly Powder. Leaving the Active Spot clears a Pokémon's effects, so a very long
+    // duration expresses "until the Defending Pokémon leaves the Active Spot".
+    map.insert(
+        "The Defending Pokémon loses all Abilities. This effect lasts until the Defending Pokémon leaves the Active Spot.",
+        Mechanic::DamageAndCardEffect {
+            opponent: true,
+            effect: CardEffect::AbilitiesDisabled,
+            duration: u8::MAX,
+            coin_flip: false,
+        },
+    );
     map.insert(
         "This attack does 30 damage for each of your Benched [D] Pokémon.",
         Mechanic::BenchCountDamage {

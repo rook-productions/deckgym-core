@@ -43,6 +43,13 @@ pub enum CardEffect {
     /// Prevent all damage done by attacks from Basic Pokémon (e.g. Carracosta's Blocking Shell).
     PreventDamageFromBasic,
     NoWeakness,
+    /// Budew's Prickly Powder: "The Defending Pokémon loses all Abilities." While this effect is on
+    /// a Pokémon, `PlayedCard::ability` / `PlayedCard::ability_mechanic` report it as having none,
+    /// which is what every ability lookup in the engine goes through — so the Pokémon stops
+    /// offering activated abilities, stops contributing passive ones, and stops deriving
+    /// ability-based `CardEffect`s. Applied with a very long duration; the wording is "until the
+    /// Defending Pokémon leaves the Active Spot", and leaving the Active Spot clears effects.
+    AbilitiesDisabled,
     CoinFlipToBlockAttack,
     DelayedDamage {
         amount: u32,

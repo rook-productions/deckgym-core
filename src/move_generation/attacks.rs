@@ -1,8 +1,5 @@
 use crate::{
-    actions::{
-        abilities::AbilityMechanic, has_ability_mechanic, Mechanic, SimpleAction,
-        EFFECT_MECHANIC_MAP,
-    },
+    actions::{abilities::AbilityMechanic, Mechanic, SimpleAction, EFFECT_MECHANIC_MAP},
     effects::CardEffect,
     hooks::{contains_energy, get_attack_cost},
     models::{Attack, PlayedCard},
@@ -92,7 +89,7 @@ fn attack_precondition_met(state: &State, player: usize, attack: &Attack) -> boo
 fn time_recall_attacks(state: &State, player: usize, active_pokemon: &PlayedCard) -> Vec<Attack> {
     let time_recall_active = state
         .enumerate_in_play_pokemon(player)
-        .any(|(_, pokemon)| has_ability_mechanic(&pokemon.card, &AbilityMechanic::TimeRecall));
+        .any(|(_, pokemon)| pokemon.has_ability(&AbilityMechanic::TimeRecall));
     if !time_recall_active {
         return Vec::new();
     }
