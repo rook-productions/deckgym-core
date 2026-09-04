@@ -453,7 +453,15 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         },
     );
     // map.insert("During your opponent's next turn, if the Defending Pokémon tries to use an attack, your opponent flips a coin. If tails, that attack doesn't happen.", todo_implementation);
-    // map.insert("During your opponent's next turn, if they attach Energy from their Energy Zone to the Defending Pokémon, that Pokémon will be Asleep.", todo_implementation);
+    map.insert(
+        "During your opponent's next turn, if they attach Energy from their Energy Zone to the Defending Pokémon, that Pokémon will be Asleep.",
+        Mechanic::DamageAndCardEffect {
+            opponent: true,
+            effect: CardEffect::AsleepWhenEnergyAttachedFromZone,
+            duration: 1,
+            coin_flip: false,
+        },
+    );
     map.insert(
         "During your opponent's next turn, if this Pokémon is damaged by an attack, do 20 damage to the Attacking Pokémon.",
         Mechanic::DamageAndCardEffect {
@@ -2199,8 +2207,24 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             coin_flip: false,
         },
     );
-    // map.insert("During your opponent's next turn, if this Pokémon is in the Active Spot when your opponent's Active Pokémon retreats, this attack does 40 damage to the new Active Pokémon.", todo_implementation);
-    // map.insert("During your opponent's next turn, this Pokémon takes -80 damage from attacks from your opponent's Pokémon ex.", todo_implementation);
+    map.insert(
+        "During your opponent's next turn, if this Pokémon is in the Active Spot when your opponent's Active Pokémon retreats, this attack does 40 damage to the new Active Pokémon.",
+        Mechanic::DamageAndCardEffect {
+            opponent: false,
+            effect: CardEffect::DamageNewActiveOnOpponentRetreat { amount: 40 },
+            duration: 1,
+            coin_flip: false,
+        },
+    );
+    map.insert(
+        "During your opponent's next turn, this Pokémon takes -80 damage from attacks from your opponent's Pokémon ex.",
+        Mechanic::DamageAndCardEffect {
+            opponent: false,
+            effect: CardEffect::ReducedDamageFromEx { amount: 80 },
+            duration: 1,
+            coin_flip: false,
+        },
+    );
     map.insert(
         "Flip 2 coins. If both of them are heads, this attack does 20 more damage.",
         Mechanic::ExtraDamageIfBothHeads { extra_damage: 20 },
@@ -2601,7 +2625,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             coin_flip: false,
         },
     );
-    // map.insert("During your opponent's next turn, they can't play any Pokémon from their hand to evolve their Pokémon.", todo_implementation);
+    map.insert(
+        "During your opponent's next turn, they can't play any Pokémon from their hand to evolve their Pokémon.",
+        Mechanic::PreventOpponentEvolutionNextTurn,
+    );
     map.insert(
         "During your opponent's next turn, this Pokémon takes +20 damage from attacks.",
         Mechanic::DamageAndCardEffect {

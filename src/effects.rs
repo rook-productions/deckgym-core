@@ -43,6 +43,20 @@ pub enum CardEffect {
     Counterattack {
         amount: u32,
     },
+    /// Aegislash's Superb Shield: this Pokémon takes `amount` less damage, but only from attacks
+    /// used by the opponent's Pokémon ex. The ex-only twin of `ReducedDamage`.
+    ReducedDamageFromEx {
+        amount: u32,
+    },
+    /// Gothitelle's Stellar Cradle: the next time this Pokémon's controller attaches Energy to it
+    /// from their Energy Zone, it falls Asleep.
+    AsleepWhenEnergyAttachedFromZone,
+    /// Galarian Stunfisk's Snapping Trap: while the Pokémon carrying this effect is in the Active
+    /// Spot, an opponent retreating their Active Pokémon takes `amount` damage on the Pokémon
+    /// they promote in its place.
+    DamageNewActiveOnOpponentRetreat {
+        amount: u32,
+    },
     // ---------------------------------------------------------------------------------------------
     // Ability-derived effects. These are not added via `add_effect`; they are *derived* on the fly
     // from a Pokémon's passive ability by `PlayedCard::get_effective_card_effects` (see

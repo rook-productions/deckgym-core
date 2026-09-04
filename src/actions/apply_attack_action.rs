@@ -1097,6 +1097,9 @@ fn forecast_effect_attack_by_mechanic(
         Mechanic::NoDamageIfAllTails { num_coins } => {
             no_damage_if_all_tails(attack.fixed_damage, *num_coins)
         }
+        Mechanic::PreventOpponentEvolutionNextTurn => {
+            prevent_opponent_evolution_next_turn(attack.fixed_damage)
+        }
     }
 }
 
@@ -1501,6 +1504,14 @@ fn all_heads_discard_opponent_active(num_coins: usize) -> AttackOutcomes {
         } else {
             AttackOutcome::noop()
         }
+    })
+}
+
+/// Malamar's Evolution Jammer: stop the opponent evolving from hand during their next turn.
+fn prevent_opponent_evolution_next_turn(damage: u32) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |_, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        state.add_turn_effect(TurnEffect::NoEvolutionFromHand { player: opponent }, 1);
     })
 }
 

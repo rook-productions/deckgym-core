@@ -10,7 +10,7 @@ use crate::{
         apply_abilities_action::forecast_ability,
         apply_action_helpers::{apply_activate, wrap_with_common_logic},
     },
-    effects::TurnEffect,
+    effects::{CardEffect, TurnEffect},
     hooks::{
         get_retreat_cost, on_bench_from_hand, on_evolve, to_playable_card, DamageModifierContext,
     },
@@ -903,6 +903,41 @@ fn apply_retreat(player: usize, state: &mut State, bench_idx: usize, is_free: bo
     }
 
     apply_activate(player, state, bench_idx);
+
+    if !is_free {
+        apply_snapping_trap_on_retreat(state, player);
+    }
+}
+
+/// Galarian Stunfisk's Snapping Trap: if the player who just retreated faces an Active Pokemon
+/// carrying the effect, the Pokemon they promoted takes the trap's damage. Only a real (paid)
+/// retreat springs the trap; being switched by an effect does not count.
+fn apply_snapping_trap_on_retreat(state: &mut State, retreating_player: usize) {
+    let opponent = (retreating_player + 1) % 2;
+    let Some(trap_damage) = state.maybe_get_active(opponent).and_then(|pokemon| {
+        pokemon
+            .get_active_effects()
+            .iter()
+            .find_map(|effect| match effect {
+                CardEffect::DamageNewActiveOnOpponentRetreat { amount } => Some(*amount),
+                _ => None,
+            })
+    }) else {
+        return;
+    };
+    if state.in_play_pokemon[retreating_player][0].is_none() {
+        return;
+    }
+
+    debug!("Snapping Trap: dealing {trap_damage} to the newly promoted Active Pokemon");
+    handle_damage_only(
+        state,
+        (opponent, 0),
+        &[(trap_damage, retreating_player, 0)],
+        false, // not an attack: no Weakness, counterattacks or Rocky Helmet recoil
+        DamageModifierContext::default(),
+    );
+    handle_knockouts(state, (opponent, 0), false);
 }
 
 // We will replace the PlayedCard, but taking into account the attached energy

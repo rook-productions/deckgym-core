@@ -930,6 +930,28 @@ fn get_reduced_card_effect_modifiers(
         .sum::<u32>()
 }
 
+/// Aegislash's Superb Shield: like `get_reduced_card_effect_modifiers`, but the reduction only
+/// counts when the attack comes from one of the opponent's Pokémon ex.
+fn get_reduced_from_ex_card_effect_modifiers(
+    state: &State,
+    is_active_to_active: bool,
+    target_player: usize,
+    attacking_pokemon: &crate::models::PlayedCard,
+) -> u32 {
+    if !is_active_to_active || !attacking_pokemon.card.is_ex() {
+        return 0;
+    }
+    state
+        .get_active(target_player)
+        .get_active_effects()
+        .iter()
+        .filter_map(|effect| match effect {
+            CardEffect::ReducedDamageFromEx { amount } => Some(*amount),
+            _ => None,
+        })
+        .sum::<u32>()
+}
+
 fn get_increased_vulnerability_modifiers(
     state: &State,
     is_active_to_active: bool,
@@ -1253,6 +1275,12 @@ pub(crate) fn modify_damage(
         0
     } else {
         get_reduced_card_effect_modifiers(state, is_active_to_active, target_player)
+            + get_reduced_from_ex_card_effect_modifiers(
+                state,
+                is_active_to_active,
+                target_player,
+                attacking_pokemon,
+            )
     };
     let increased_vulnerability_modifiers = if skip_target_effects {
         0

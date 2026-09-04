@@ -809,6 +809,10 @@ pub enum Mechanic {
     NoDamageIfAllTails {
         num_coins: usize,
     },
+    /// Malamar's Evolution Jammer: during the opponent's next turn they can't play Pokémon from
+    /// their hand to evolve. The opponent's index is only known when the attack resolves, so this
+    /// is its own variant rather than a `DamageAndTurnEffect` carrying a fixed player.
+    PreventOpponentEvolutionNextTurn,
     /// Emolga (Windup Thunder) / Dedenne ex (Dede-Circuit):
     /// deal `damage_per` damage for each Pokémon Tool attached to any of your
     /// Pokémon in play (active + bench).
