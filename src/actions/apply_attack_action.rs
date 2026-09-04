@@ -1131,6 +1131,9 @@ fn move_own_energy_any_way(damage: u32) -> AttackOutcomes {
     AttackOutcomes::single(AttackOutcome::damage_then_effect(
         vec![(damage, true, 0)],
         move |_, state, action| {
+            if !attacker_still_in_play(state, action.actor) {
+                return;
+            }
             let budget = total_attached_energy(state, action.actor);
             let choices = energy_blender_choices(state, action.actor, budget);
             if !choices.is_empty() {
@@ -1172,6 +1175,16 @@ fn inflict_poison_with_damage(damage: u32, poison_damage: u32) -> AttackOutcomes
     })
 }
 
+/// Whether the attacking Pokémon is still in the Active Spot and alive. Follow-up effects that act
+/// *from* the attacker (spot damage it deals, Energy it moves, a switch it makes) must not run
+/// after it has been knocked out — e.g. by Rocky Helmet recoil on the attack's own damage — both
+/// because the card says so and because `ApplyDamage` needs a live `attacking_ref`.
+fn attacker_still_in_play(state: &State, actor: usize) -> bool {
+    state.in_play_pokemon[actor][0]
+        .as_ref()
+        .is_some_and(|pokemon| !pokemon.is_knocked_out())
+}
+
 /// Tapu Koko - Volt Switch: like `switch_self_with_bench`, but only Benched Pokémon of
 /// `energy_type` may be switched in. The switch is mandatory when at least one is eligible.
 fn switch_self_with_bench_of_type(
@@ -1191,10 +1204,7 @@ fn switch_self_with_bench_of_type(
     AttackOutcomes::single(AttackOutcome::damage_then_effect(
         vec![(damage, true, 0)],
         move |_, state, action| {
-            let attacker_alive = state.in_play_pokemon[action.actor][0]
-                .as_ref()
-                .is_some_and(|p| !p.is_knocked_out());
-            if !choices.is_empty() && attacker_alive {
+            if !choices.is_empty() && attacker_still_in_play(state, action.actor) {
                 state
                     .move_generation_stack
                     .push((action.actor, choices.clone()));
@@ -1274,6 +1284,11 @@ fn self_damage_and_all_bench_damage(
 /// (the attacking Pokémon itself is a legal target).
 fn also_choice_own_pokemon_damage(active_damage: u32, damage: u32) -> AttackOutcomes {
     active_damage_effect_doutcome(active_damage, move |_, state, action| {
+        // The bonus damage is dealt *by* the attacker, so it fizzles if the attacker was itself
+        // knocked out first (e.g. by Rocky Helmet recoil on the main hit).
+        if !attacker_still_in_play(state, action.actor) {
+            return;
+        }
         let choices: Vec<SimpleAction> = state
             .enumerate_in_play_pokemon(action.actor)
             .map(|(in_play_idx, _)| SimpleAction::ApplyDamage {
@@ -1367,10 +1382,7 @@ fn may_shuffle_self_into_deck(damage: u32) -> AttackOutcomes {
         vec![(damage, true, 0)],
         move |_, state, action| {
             // Nothing to offer if the attacker was knocked out by counterdamage.
-            let attacker_alive = state.in_play_pokemon[action.actor][0]
-                .as_ref()
-                .is_some_and(|p| !p.is_knocked_out());
-            if !attacker_alive {
+            if !attacker_still_in_play(state, action.actor) {
                 return;
             }
             state.move_generation_stack.push((
@@ -1497,6 +1509,9 @@ fn optional_discard_benched_type_for_extra_damage(
         .collect();
 
     active_damage_effect_doutcome(0, move |_, state, action| {
+        if !attacker_still_in_play(state, action.actor) {
+            return;
+        }
         state
             .move_generation_stack
             .push((action.actor, choices.clone()));
