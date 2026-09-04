@@ -311,6 +311,9 @@ pub fn trainer_move_generation_implementation(
         CardId::B1222Hala | CardId::B1267Hala => can_play_trainer(state, trainer_card),
         CardId::B2151Juggler | CardId::B2192Juggler => can_play_juggler(state, trainer_card),
         CardId::B2a089Iono | CardId::B2a106Iono => can_play_trainer(state, trainer_card),
+        CardId::A3b069Penny | CardId::A3b086Penny | CardId::B2a092Penny | CardId::B2a109Penny => {
+            can_play_trainer(state, trainer_card)
+        }
         _ => None,
     }
 }

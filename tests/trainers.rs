@@ -34,6 +34,8 @@ mod mallow_test;
 mod marlon_test;
 #[path = "trainers/order_pad_test.rs"]
 mod order_pad_test;
+#[path = "trainers/penny_test.rs"]
+mod penny_test;
 #[path = "trainers/professor_sada_test.rs"]
 mod professor_sada_test;
 #[path = "trainers/professor_turo_test.rs"]

@@ -1,6 +1,8 @@
 use std::cmp::min;
 
 use log::debug;
+use rand::distributions::WeightedIndex;
+use rand::prelude::Distribution;
 use rand::rngs::StdRng;
 use rand::Rng;
 
@@ -22,6 +24,7 @@ use crate::{
     effects::{CardEffect, TurnEffect},
     hooks::{get_stage, is_ancient_pokemon, is_future_pokemon, is_ultra_beast, ultra_beast_names},
     models::{Card, EnergyType, StatusCondition, TrainerCard, TrainerType},
+    move_generation::trainer_move_generation_implementation,
     tools::{enumerate_tool_choices, is_tool_effect_implemented},
     State,
 };
@@ -281,8 +284,64 @@ pub fn forecast_trainer_action(
         CardId::B1222Hala | CardId::B1267Hala => Outcomes::single_fn(hala_effect),
         CardId::B2151Juggler | CardId::B2192Juggler => Outcomes::single_fn(juggler_effect),
         CardId::B2a089Iono | CardId::B2a106Iono => Outcomes::single_fn(iono_effect),
+        CardId::A3b069Penny | CardId::A3b086Penny | CardId::B2a092Penny | CardId::B2a109Penny => {
+            Outcomes::single_fn(penny_effect)
+        }
         _ => panic!("Unsupported Trainer Card"),
     }
+}
+
+/// Penny: "Look at a random Supporter card that's not Penny from your opponent's deck and shuffle
+/// it back into their deck. Use the effect of that card as the effect of this card."
+///
+/// The copied Supporter is picked with the shared RNG *inside* the mutation rather than branching
+/// the forecast over every Supporter in the opponent's deck. Branching would both explode the game
+/// tree (each candidate's own outcomes multiply through) and leak the opponent's deck contents to
+/// the forecasting bots — the same reason Team Rocket's Researcher resolves its pulls this way.
+/// The chosen Supporter's own outcome distribution is then sampled with that RNG, exactly as
+/// `apply_action` would have done had the player played it directly.
+///
+/// Only Supporters this engine actually implements are eligible, so copying can never reach the
+/// `panic!` arm above. Penny itself is excluded by name, as the card says, which also rules out
+/// unbounded recursion.
+fn penny_effect(rng: &mut StdRng, state: &mut State, action: &Action) {
+    let opponent = (action.actor + 1) % 2;
+    let candidates: Vec<TrainerCard> = state.decks[opponent]
+        .cards
+        .iter()
+        .filter_map(|card| match card {
+            Card::Trainer(trainer_card)
+                if trainer_card.trainer_card_type == TrainerType::Supporter
+                    && trainer_card.name != "Penny"
+                    && trainer_move_generation_implementation(state, trainer_card).is_some() =>
+            {
+                Some(trainer_card.clone())
+            }
+            _ => None,
+        })
+        .collect();
+
+    // "...and shuffle it back into their deck": nothing leaves the deck, but the look-and-shuffle
+    // still reorders it.
+    state.decks[opponent].shuffle(false, rng);
+
+    if candidates.is_empty() {
+        debug!("Penny: No eligible Supporter in the opponent's deck");
+        return;
+    }
+    let chosen = &candidates[rng.gen_range(0..candidates.len())];
+    debug!("Penny: Copying the effect of {}", chosen.name);
+
+    let (probabilities, mut mutations) =
+        forecast_trainer_action(action.actor, state, chosen).into_branches();
+    let chosen_index = if probabilities.len() == 1 {
+        0
+    } else {
+        WeightedIndex::new(&probabilities)
+            .expect("Copied Supporter outcomes should form a valid distribution")
+            .sample(rng)
+    };
+    mutations.remove(chosen_index)(rng, state, action);
 }
 
 /// Rotom Dex: "Look at the top card of your deck. Then, you may shuffle your deck." The look is
