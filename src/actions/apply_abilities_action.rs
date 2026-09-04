@@ -250,6 +250,9 @@ fn forecast_ability_by_mechanic(
         AbilityMechanic::PreventOpponentAttackEffectsOnSelf => {
             panic!("PreventOpponentAttackEffectsOnSelf is a passive ability")
         }
+        AbilityMechanic::BasicPokemonHaveNoAbilities => {
+            panic!("BasicPokemonHaveNoAbilities is a passive ability")
+        }
         AbilityMechanic::ReduceTypedAttackCostIfHasTool { .. }
         | AbilityMechanic::IncreaseHpOfYourTypedPokemon { .. }
         | AbilityMechanic::NoHealingForAnyone

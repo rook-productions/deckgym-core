@@ -615,7 +615,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
         );
 
         // B2 and B2a mechanics
-        // map.insert("Basic Pokémon in play (both yours and your opponent's) have no Abilities.", todo_implementation);
+        map.insert(
+            "Basic Pokémon in play (both yours and your opponent's) have no Abilities.",
+            AbilityMechanic::BasicPokemonHaveNoAbilities,
+        );
         map.insert(
             "If this Pokémon's remaining HP is 50 or less, attacks used by this Pokémon do +60 damage to your opponent's Active Pokémon.",
             AbilityMechanic::IncreaseDamageWhenRemainingHpAtMost {

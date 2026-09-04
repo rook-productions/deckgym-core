@@ -36,6 +36,12 @@ pub struct PlayedCard {
     /// `heal` is a no-op. Kept in sync by `State::refresh_ability_board_bonuses`.
     #[serde(default)]
     heal_blocked: bool,
+    /// Whether this Pokémon is a Basic *and* a Power of Alchemy ability (Alolan Muk) is in play
+    /// for either player, in which case it has no Ability. Kept in sync by
+    /// `State::refresh_ability_board_bonuses`, like `heal_blocked`. Only ever set on Basics, so
+    /// the board scan that computes it can read a suppressor's Ability without recursing.
+    #[serde(default)]
+    basic_abilities_suppressed: bool,
     pub attached_energy: Vec<EnergyType>,
     pub attached_tool: Option<Card>,
     pub played_this_turn: bool,
@@ -90,6 +96,7 @@ impl PlayedCard {
             double_grass_active: false,
             ability_hp_bonus: 0,
             heal_blocked: false,
+            basic_abilities_suppressed: false,
             attached_energy,
             played_this_turn,
             moved_to_active_this_turn: false,
@@ -232,6 +239,13 @@ impl PlayedCard {
     pub(crate) fn refresh_double_grass_active(&mut self, jungle_totem_active_for_owner: bool) {
         self.double_grass_active =
             jungle_totem_active_for_owner && self.card.get_type() == Some(EnergyType::Grass);
+    }
+
+    /// Keeps `basic_abilities_suppressed` in sync with whether a Power of Alchemy Ability (Alolan
+    /// Muk) is in play for either player. Called by `State::refresh_ability_board_bonuses` before
+    /// the other board scans, since it changes which Abilities those scans can see.
+    pub(crate) fn refresh_basic_abilities_suppressed(&mut self, power_of_alchemy_active: bool) {
+        self.basic_abilities_suppressed = power_of_alchemy_active && self.is_basic_in_play();
     }
 
     /// Keeps the ability-derived board bonuses in sync. Called by
@@ -430,11 +444,36 @@ impl PlayedCard {
         effects
     }
 
-    /// Whether this Pokémon has been stripped of its Abilities (Budew's Prickly Powder).
-    fn abilities_disabled(&self) -> bool {
+    /// Whether an effect has stripped this Pokémon of its Abilities (Budew's Prickly Powder).
+    /// Deliberately ignores `basic_abilities_suppressed`, so a Power of Alchemy board scan can
+    /// use `suppresses_basic_abilities` without recursing through the suppression it computes.
+    fn abilities_disabled_by_effect(&self) -> bool {
         self.effects
             .iter()
             .any(|(effect, _)| matches!(effect, CardEffect::AbilitiesDisabled))
+    }
+
+    /// Whether this Pokémon has no Abilities in play: either an effect stripped them (Budew's
+    /// Prickly Powder) or it is a Basic while Alolan Muk's Power of Alchemy is in play.
+    fn abilities_disabled(&self) -> bool {
+        self.abilities_disabled_by_effect() || self.basic_abilities_suppressed
+    }
+
+    /// Whether this Pokémon is currently projecting Alolan Muk's Power of Alchemy onto every
+    /// Basic in play. Only the board scan in `State::refresh_ability_board_bonuses` should call
+    /// this: it reads the card-level Ability so that it stays correct no matter what the (stale)
+    /// suppression flags say, while still honouring an effect that disabled the suppressor.
+    pub(crate) fn suppresses_basic_abilities(&self) -> bool {
+        !self.abilities_disabled_by_effect()
+            && get_ability_mechanic(&self.card)
+                == Some(&AbilityMechanic::BasicPokemonHaveNoAbilities)
+    }
+
+    /// Whether this Pokémon counts as a Basic Pokémon in play. Fossils are treated as Basics by
+    /// the engine (see `hooks::get_stage`); they carry no Abilities, so this only matters for
+    /// consistency.
+    pub(crate) fn is_basic_in_play(&self) -> bool {
+        self.card.is_basic() || self.is_fossil()
     }
 
     /// This Pokémon's Ability as it applies *in play*, i.e. `None` while its Abilities are

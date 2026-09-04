@@ -224,10 +224,24 @@ impl State {
         self.refresh_ability_board_bonuses();
     }
 
-    /// Recomputes the cached, board-dependent ability bonuses on every in-play Pokémon:
-    /// Lilligant's Toughness Aroma (+HP for the owner's Pokémon of a type) and Claydol's Heal
-    /// Block (no Pokémon on either side can be healed).
+    /// Recomputes the cached, board-dependent ability bonuses on every in-play Pokémon: Alolan
+    /// Muk's Power of Alchemy (Basics on either side have no Abilities), Lilligant's Toughness
+    /// Aroma (+HP for the owner's Pokémon of a type) and Claydol's Heal Block (no Pokémon on
+    /// either side can be healed).
     pub(crate) fn refresh_ability_board_bonuses(&mut self) {
+        // Power of Alchemy has to be resolved first: it decides which Abilities the scans below
+        // are even allowed to see. `suppresses_basic_abilities` reads the card-level Ability, so
+        // it neither depends on the flags being written here nor recurses through them.
+        let power_of_alchemy_active = self
+            .in_play_pokemon
+            .iter()
+            .flatten()
+            .flatten()
+            .any(|pokemon| pokemon.suppresses_basic_abilities());
+        for pokemon in self.in_play_pokemon.iter_mut().flatten().flatten() {
+            pokemon.refresh_basic_abilities_suppressed(power_of_alchemy_active);
+        }
+
         let heal_blocked = (0..2).any(|player| {
             self.enumerate_in_play_pokemon(player)
                 .any(|(_, pokemon)| pokemon.has_ability(&AbilityMechanic::NoHealingForAnyone))

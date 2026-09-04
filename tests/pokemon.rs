@@ -8,6 +8,8 @@ mod alcremie_test;
 mod alolan_marowak_test;
 #[path = "pokemon/alolan_muk_ex_chemical_panic_test.rs"]
 mod alolan_muk_ex_chemical_panic_test;
+#[path = "pokemon/alolan_muk_power_of_alchemy_test.rs"]
+mod alolan_muk_power_of_alchemy_test;
 #[path = "pokemon/alolan_sandslash_spike_armor_test.rs"]
 mod alolan_sandslash_spike_armor_test;
 #[path = "pokemon/alomomola_hooh_test.rs"]
