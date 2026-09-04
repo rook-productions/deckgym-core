@@ -81,6 +81,11 @@ fn get_weight(action: &SimpleAction) -> u32 {
         SimpleAction::ApplyStatusToOpponentActive { .. } => 10,
         SimpleAction::ApplyStatusesToOpponentActive { .. } => 10,
         SimpleAction::MoveOpponentActiveEnergyToSelf { .. } => 10,
+        SimpleAction::HealAndCureConditions { .. } => 5,
+        SimpleAction::MoveDamageToOpponentActive { .. } => 10,
+        SimpleAction::BenchOpponentPokemonFromDiscard { .. } => 5,
+        SimpleAction::ShuffleOwnDeck => 1,
+        SimpleAction::ShuffleRandomOwnHandCardIntoDeck => 1,
         SimpleAction::UseStadium => 5, // Stadium abilities like Mesagoza
         SimpleAction::Noop => 0,       // No operation has no weight
     }

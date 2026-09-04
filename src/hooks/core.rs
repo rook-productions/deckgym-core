@@ -84,6 +84,12 @@ pub fn is_ultra_beast(pokemon_name: &str) -> bool {
     ULTRA_BEAST_NAMES.contains(&pokemon_name)
 }
 
+/// Every Ultra Beast name, for cards that phrase an effect as "all of your Ultra Beasts"
+/// (e.g. Beast Wall) and need to feed a name list into a `TurnEffect`.
+pub fn ultra_beast_names() -> &'static [&'static str] {
+    &ULTRA_BEAST_NAMES
+}
+
 pub fn to_playable_card(card: &crate::models::Card, played_this_turn: bool) -> PlayedCard {
     let base_hp = match card {
         Card::Pokemon(pokemon_card) => pokemon_card.hp,
@@ -443,6 +449,8 @@ pub(crate) fn on_end_turn(player_ending_turn: usize, state: &mut State) {
 
     apply_leftovers_healing(player_ending_turn, state);
 
+    apply_berry_tools(state);
+
     apply_deceptive_needle_damage(player_ending_turn, state);
 
     apply_bad_dreams_damage(state);
@@ -459,6 +467,41 @@ fn apply_leftovers_healing(player_ending_turn: usize, state: &mut State) {
     }
     debug!("Leftovers: Healing 10 damage from the Active Pokémon");
     active.heal(10);
+}
+
+/// Lum Berry and Sitrus Berry both trigger "at the end of each turn" — that is, at the end of
+/// *either* player's turn and for Pokémon belonging to either player, not just the player whose
+/// turn is ending. Both discard themselves when they fire, so each is checked once per end of
+/// turn across every Pokémon in play.
+fn apply_berry_tools(state: &mut State) {
+    let mut to_discard: Vec<(usize, usize)> = Vec::new();
+    for player in 0..2 {
+        for in_play_idx in 0..4 {
+            let Some(pokemon) = state.in_play_pokemon[player][in_play_idx].as_mut() else {
+                continue;
+            };
+            // Lum Berry: "...if the Pokémon this card is attached to is affected by any Special
+            // Conditions, it recovers from all of them, and discard this card."
+            if has_tool(pokemon, CardId::A2149LumBerry) && pokemon.has_status_condition() {
+                debug!("Lum Berry: Curing all Special Conditions and discarding the tool");
+                pokemon.cure_status_conditions();
+                to_discard.push((player, in_play_idx));
+                continue;
+            }
+            // Sitrus Berry: "...if the Pokémon this card is attached to has half of its maximum HP
+            // or less remaining, heal 30 damage from it. If you do, discard this card."
+            if has_tool(pokemon, CardId::B1218SitrusBerry)
+                && pokemon.get_remaining_hp() * 2 <= pokemon.get_effective_total_hp()
+            {
+                debug!("Sitrus Berry: Healing 30 damage and discarding the tool");
+                pokemon.heal(30);
+                to_discard.push((player, in_play_idx));
+            }
+        }
+    }
+    for (player, in_play_idx) in to_discard {
+        state.discard_tool(player, in_play_idx);
+    }
 }
 
 /// Deceptive Needle: At the end of your turn, if the [D] Pokémon this card is attached to is in
@@ -955,6 +998,11 @@ fn get_turn_effect_damage_reduction(
             {
                 Some(*amount)
             }
+            TurnEffect::ReducedDamageForAllPokemon { amount, player }
+                if *player == target_player =>
+            {
+                Some(*amount)
+            }
             _ => None,
         })
         .sum::<u32>()
@@ -1262,6 +1310,12 @@ pub(crate) fn modify_damage(
         0
     };
 
+    let beastite_damage_bonus = if is_active_to_active {
+        get_beastite_damage_bonus(state, attacking_player, attacking_pokemon)
+    } else {
+        0
+    };
+
     // Stadium damage bonus (e.g., Training Area for Stage 1 Pokemon)
     // Only applies to attacks against the opponent's Active Pokemon
     let stadium_damage_bonus = if is_active_to_active {
@@ -1303,7 +1357,8 @@ pub(crate) fn modify_damage(
         + increased_vulnerability_modifiers
         + type_boost_bonus
         + stadium_damage_bonus
-        + future_booster_damage_bonus)
+        + future_booster_damage_bonus
+        + beastite_damage_bonus)
         .saturating_sub(
             reduced_card_effect_modifiers
                 + reduced_turn_effect_modifiers
@@ -1329,6 +1384,25 @@ pub(crate) fn modify_damage(
     }
 
     final_damage
+}
+
+/// Beastite: "Attacks used by the Ultra Beast this card is attached to do +10 damage to your
+/// opponent's Active Pokémon for each point you have gotten."
+fn get_beastite_damage_bonus(
+    state: &State,
+    attacking_player: usize,
+    attacking_pokemon: &PlayedCard,
+) -> u32 {
+    if !has_tool(attacking_pokemon, CardId::A3a066Beastite)
+        || !is_ultra_beast(&attacking_pokemon.get_name())
+    {
+        return 0;
+    }
+    let bonus = 10 * state.points[attacking_player] as u32;
+    if bonus > 0 {
+        debug!("Beastite: Increasing damage by {}", bonus);
+    }
+    bonus
 }
 
 /// Calculate type-specific damage boost from abilities like Lucario's Fighting Coach or Aegislash's Royal Command
@@ -1741,6 +1815,13 @@ pub(crate) fn on_attack_knockout(
         Some(AbilityMechanic::ProtectSelfNextTurnAfterAttackKnockout)
     ) {
         attacking_pokemon.add_effect(CardEffect::PreventAllDamageAndEffects, 1);
+    }
+
+    // Lucky Mittens: "Whenever your opponent's Pokémon is Knocked Out by damage from an attack
+    // used by the Pokémon this card is attached to, draw a card."
+    if has_tool(attacking_pokemon, CardId::B1220LuckyMittens) {
+        debug!("Lucky Mittens: Drawing a card after knocking out an opponent's Pokemon");
+        state.maybe_draw_card(attacking_ref.0);
     }
 }
 

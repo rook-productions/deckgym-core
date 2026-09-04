@@ -16,6 +16,7 @@ use crate::{
     },
     models::{Card, StatusCondition, TrainerType},
     state::GameOutcome,
+    tools::has_tool,
     State,
 };
 
@@ -599,8 +600,33 @@ pub(crate) fn handle_damage_only(
 
         if attacking_player != target_player {
             apply_bouncy_body(state, target_player);
+            apply_dark_pendant_trigger(state, attacking_player, target_player);
         }
     }
+}
+
+/// Dark Pendant: "If the [D] Pokémon this card is attached to is in the Active Spot and is damaged
+/// by an attack from your opponent's Pokémon, your opponent reveals a random card from their hand
+/// and shuffles it into their deck."
+///
+/// The shuffle needs the shared RNG, which the damage path does not carry, so it is queued as the
+/// single option on the attacker's move-generation stack (the same trick Bouncy Body uses for its
+/// choice). With one option it is not a decision — it just resolves where an RNG is available.
+fn apply_dark_pendant_trigger(state: &mut State, attacking_player: usize, target_player: usize) {
+    let Some(defender) = state.in_play_pokemon[target_player][0].as_ref() else {
+        return;
+    };
+    if !has_tool(defender, CardId::A4154DarkPendant)
+        || defender.get_energy_type() != Some(crate::models::EnergyType::Darkness)
+        || state.hands[attacking_player].is_empty()
+    {
+        return;
+    }
+    debug!("Dark Pendant: Attacker shuffles a random card from their hand into their deck");
+    state.move_generation_stack.push((
+        attacking_player,
+        vec![SimpleAction::ShuffleRandomOwnHandCardIntoDeck],
+    ));
 }
 
 /// Jellicent's Bouncy Body: the Active Pokémon was just damaged by an attack from the opponent's
@@ -667,6 +693,11 @@ pub(crate) fn handle_knockouts(
     attacking_ref: (usize, usize), // (attacking_player, attacking_pokemon_idx)
     is_from_active_attack: bool,
 ) {
+    // Hala: "During your opponent's next turn, if your Hariyama or Crabominable would be Knocked
+    // Out by damage from an attack, it is not Knocked Out and its remaining HP becomes 10."
+    // Applied before the KO list is taken, so a protected Pokémon never enters it.
+    apply_survive_knockout_turn_effects(state, is_from_active_attack);
+
     let knockouts = get_knocked_out(state);
     let iris_bonus_active = is_iris_bonus_active(state, attacking_ref, is_from_active_attack);
 
@@ -713,7 +744,19 @@ pub(crate) fn handle_knockouts(
             state.record_knocked_out_by_opponent_attack(ko_pokemon_type);
         }
 
-        state.discard_from_play(ko_receiver, ko_pokemon_idx);
+        // Rescue Scarf: "If the Pokémon this card is attached to is Knocked Out by damage from an
+        // attack from your opponent's Pokémon, put it into your hand instead of the discard pile."
+        let rescued = is_from_active_attack
+            && ko_receiver != attacking_ref.0
+            && state.in_play_pokemon[ko_receiver][ko_pokemon_idx]
+                .as_ref()
+                .is_some_and(|pokemon| has_tool(pokemon, CardId::A4155RescueScarf));
+        if rescued {
+            debug!("Rescue Scarf: Returning the Knocked Out Pokemon to its owner's hand");
+            state.return_from_play_to_hand(ko_receiver, ko_pokemon_idx);
+        } else {
+            state.discard_from_play(ko_receiver, ko_pokemon_idx);
+        }
     }
 
     // If game ends because of knockouts, set winner and return so as to short-circuit promotion logic
@@ -752,6 +795,43 @@ pub(crate) fn handle_knockouts(
         }
         // If K.O. was Active, trigger promotion or declare winner
         state.trigger_promotion_or_declare_winner(ko_receiver);
+    }
+}
+
+/// Hala-style protection: any Pokémon that would be Knocked Out by attack damage and is covered by
+/// a `SurviveKnockOutForSpecificPokemon` turn effect survives instead, at a fixed remaining HP.
+/// Only attack damage qualifies, so poison/burn/self-inflicted knockouts still resolve normally.
+fn apply_survive_knockout_turn_effects(state: &mut State, is_from_active_attack: bool) {
+    if !is_from_active_attack {
+        return;
+    }
+    let protections: Vec<(usize, Vec<String>, u32)> = state
+        .get_current_turn_effects()
+        .into_iter()
+        .filter_map(|effect| match effect {
+            TurnEffect::SurviveKnockOutForSpecificPokemon {
+                pokemon_names,
+                player,
+                remaining_hp,
+            } => Some((player, pokemon_names, remaining_hp)),
+            _ => None,
+        })
+        .collect();
+    if protections.is_empty() {
+        return;
+    }
+
+    for (player, pokemon_names, remaining_hp) in protections {
+        for pokemon in state.in_play_pokemon[player].iter_mut().flatten() {
+            if pokemon.is_knocked_out() && pokemon_names.contains(&pokemon.get_name()) {
+                debug!(
+                    "Survive Knock Out: {} survives with {} HP",
+                    pokemon.get_name(),
+                    remaining_hp
+                );
+                pokemon.set_remaining_hp(remaining_hp);
+            }
+        }
     }
 }
 
