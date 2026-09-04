@@ -6,6 +6,8 @@ mod additional_ability_logic_test;
 mod alcremie_test;
 #[path = "pokemon/alolan_marowak_test.rs"]
 mod alolan_marowak_test;
+#[path = "pokemon/alolan_muk_ex_chemical_panic_test.rs"]
+mod alolan_muk_ex_chemical_panic_test;
 #[path = "pokemon/alolan_sandslash_spike_armor_test.rs"]
 mod alolan_sandslash_spike_armor_test;
 #[path = "pokemon/alomomola_hooh_test.rs"]
@@ -50,6 +52,8 @@ mod cascoon_harden_test;
 mod castform_test;
 #[path = "pokemon/caterpie_quick_growth_test.rs"]
 mod caterpie_quick_growth_test;
+#[path = "pokemon/celebi_temporal_leaves_test.rs"]
+mod celebi_temporal_leaves_test;
 #[path = "pokemon/celebi_time_recall_test.rs"]
 mod celebi_time_recall_test;
 #[path = "pokemon/chansey_blissey_test.rs"]
@@ -228,6 +232,8 @@ mod milotic_ex_aqua_charge_test;
 mod miraidon_ex_test;
 #[path = "pokemon/morpeko_test.rs"]
 mod morpeko_test;
+#[path = "pokemon/move_energy_to_bench_test.rs"]
+mod move_energy_to_bench_test;
 #[path = "pokemon/nidoqueen_test.rs"]
 mod nidoqueen_test;
 #[path = "pokemon/ninetales_ember_dance_test.rs"]
