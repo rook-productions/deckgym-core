@@ -158,6 +158,12 @@ pub enum AbilityMechanic {
     SearchRandomPokemonFromDeck,
     MoveDamageFromOneYourPokemonToThisPokemon,
     DiscardOpponentActiveToolsAndDiscardSelf,
+    /// Revavroom's Dual Customization: "This Pokémon may have up to 2 Pokémon Tool cards attached
+    /// to it." `amount` is the number of Tool slots *beyond* the usual one. Passive; read by
+    /// `PlayedCard::tool_capacity`, which gates attachment in `tools::enumerate_tool_choices`.
+    ExtraToolSlots {
+        amount: u32,
+    },
     PreventFirstAttack,
     ElectromagneticWall,
     InfiltratingInspection,

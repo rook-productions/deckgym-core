@@ -547,8 +547,9 @@ fn apply_deterministic_action(rng: &mut StdRng, state: &mut State, action: &Acti
         SimpleAction::DiscardToolFromPokemon {
             player,
             in_play_idx,
+            tool_idx,
         } => {
-            state.discard_tool(*player, *in_play_idx);
+            state.discard_tool_at(*player, *in_play_idx, *tool_idx);
         }
         SimpleAction::DiscardActiveStadium => {
             if let Some((stadium, owner)) = state.take_active_stadium() {
@@ -688,7 +689,7 @@ fn apply_attach_tool(state: &mut State, actor: usize, in_play_idx: usize, tool_c
     let pokemon = state.in_play_pokemon[actor][in_play_idx]
         .as_mut()
         .expect("Pokemon should be there if attaching tool to it");
-    pokemon.attached_tool = Some(tool_card.clone());
+    pokemon.attach_tool(tool_card.clone());
 
     // Steel Apron: "...recovers from all Special Conditions..." only for a [M] holder.
     if tools::has_tool(pokemon, crate::card_ids::CardId::A4153SteelApron)
@@ -1210,7 +1211,7 @@ pub(crate) fn apply_evolve(
         let damage_taken = from_pokemon.get_damage_counters();
         played_card.apply_damage(damage_taken);
         played_card.attached_energy = from_pokemon.attached_energy.clone();
-        played_card.attached_tool = from_pokemon.attached_tool.clone();
+        played_card.attached_tools = from_pokemon.attached_tools.clone();
         played_card.cards_behind = from_pokemon.cards_behind.clone();
         played_card.cards_behind.push(from_pokemon.card.clone());
         state.in_play_pokemon[acting_player][position] = Some(played_card);
