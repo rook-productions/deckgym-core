@@ -370,6 +370,8 @@ mod wailord_test;
 mod walking_wake_test;
 #[path = "pokemon/whiscash_test.rs"]
 mod whiscash_test;
+#[path = "pokemon/wobbuffet_reply_strongly_test.rs"]
+mod wobbuffet_reply_strongly_test;
 #[path = "pokemon/wugtrio_b2a_test.rs"]
 mod wugtrio_b2a_test;
 #[path = "pokemon/xatu_test.rs"]

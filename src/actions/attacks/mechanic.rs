@@ -836,6 +836,11 @@ pub enum Mechanic {
         condition: AttackCostCondition,
         cost: Vec<EnergyType>,
     },
+    /// Wobbuffet - Reply Strongly: extra damage when this Pokémon was damaged by an attack
+    /// during the opponent's last turn while it was in the Active Spot.
+    ExtraDamageIfDamagedWhileActiveLastTurn {
+        extra_damage: u32,
+    },
     /// Bidoof - Super Fang: halve the opponent's Active Pokémon's remaining HP, rounded down.
     /// Pocket tracks HP in multiples of 10, so the result is rounded down to the nearest 10
     /// (e.g. 70 HP remaining becomes 30). This sets HP directly, so it is not affected by

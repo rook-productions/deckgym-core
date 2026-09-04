@@ -554,6 +554,9 @@ pub(crate) fn handle_damage_only(
                 .as_mut()
                 .expect("Pokemon should be there if taking damage");
             target_pokemon.apply_damage(damage); // Applies without surpassing 0 HP
+            if is_from_active_attack && target_pokemon_idx == 0 {
+                target_pokemon.mark_damaged_by_attack_while_active();
+            }
             debug!(
                 "Dealt {} damage to opponent's {} Pokemon. Remaining HP: {}",
                 damage,

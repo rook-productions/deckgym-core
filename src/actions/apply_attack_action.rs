@@ -1100,6 +1100,13 @@ fn forecast_effect_attack_by_mechanic(
         // The cost substitution happens in `hooks::get_effective_attack_cost`; the attack itself
         // is plain fixed damage.
         Mechanic::AlternateAttackCost { .. } => active_damage_doutcome(attack.fixed_damage),
+        Mechanic::ExtraDamageIfDamagedWhileActiveLastTurn { extra_damage } => {
+            extra_damage_if_damaged_while_active_last_turn(
+                state,
+                attack.fixed_damage,
+                *extra_damage,
+            )
+        }
         Mechanic::HalveOpponentActiveHp => halve_opponent_active_hp(),
     }
 }
@@ -1154,6 +1161,18 @@ fn discard_opponent_energy_if_evolved_from_this_turn(
     active_damage_effect_doutcome(damage, move |rng, state, action| {
         discard_random_energy_from_opponent_active(rng, state, action.actor, count);
     })
+}
+
+/// Wobbuffet - Reply Strongly.
+fn extra_damage_if_damaged_while_active_last_turn(
+    state: &State,
+    base: u32,
+    extra: u32,
+) -> AttackOutcomes {
+    let was_damaged = state
+        .get_active(state.current_player)
+        .was_damaged_by_attack_while_active_last_turn();
+    active_damage_doutcome(if was_damaged { base + extra } else { base })
 }
 
 /// Bidoof - Super Fang. Pocket keeps HP in multiples of 10, so "rounded down" rounds the halved

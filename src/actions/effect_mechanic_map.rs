@@ -1200,7 +1200,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             duration: 1,
         },
     );
-    // map.insert("If this Pokémon was damaged by an attack during your opponent's last turn while it was in the Active Spot, this attack does 50 more damage.", todo_implementation);
+    map.insert(
+        "If this Pokémon was damaged by an attack during your opponent's last turn while it was in the Active Spot, this attack does 50 more damage.",
+        Mechanic::ExtraDamageIfDamagedWhileActiveLastTurn { extra_damage: 50 },
+    );
     map.insert(
         "If this Pokémon's remaining HP is 30 or less, this attack does 60 more damage.",
         Mechanic::ExtraDamageIfSelfHpAtMost {
