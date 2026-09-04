@@ -44,9 +44,7 @@ pub(crate) fn get_retreat_cost(state: &State, card: &PlayedCard) -> Vec<EnergyTy
         for _ in 0..retreat_cost_increase {
             normal_cost.push(EnergyType::Colorless);
         }
-        if has_tool(card, CardId::A4a067InflatableBoat)
-            && card.get_energy_type() == Some(EnergyType::Water)
-        {
+        if has_tool(card, CardId::A4a067InflatableBoat) && card.is_type(EnergyType::Water) {
             normal_cost.pop();
         }
         if has_tool(card, CardId::B2a087BigAirBalloon) && pokemon_card.stage == 2 {
@@ -81,17 +79,17 @@ pub(crate) fn get_retreat_cost(state: &State, card: &PlayedCard) -> Vec<EnergyTy
                 }
             }
         }
-        if let Some(active_energy_type) = card.get_energy_type() {
-            let current_player = state.current_player;
-            for (_idx, benched_pokemon) in state.enumerate_bench_pokemon(current_player) {
-                if let Some(AbilityMechanic::ReduceRetreatCostOfYourActiveTypedFromBench {
-                    energy_type,
-                    amount,
-                }) = benched_pokemon.ability_mechanic()
-                {
-                    if energy_type == &active_energy_type {
-                        to_subtract += *amount as u8;
-                    }
+        // Each benched source applies its reduction once, even if the Active Pokémon happens to
+        // count as the required type through more than one of its in-play types.
+        let current_player = state.current_player;
+        for (_idx, benched_pokemon) in state.enumerate_bench_pokemon(current_player) {
+            if let Some(AbilityMechanic::ReduceRetreatCostOfYourActiveTypedFromBench {
+                energy_type,
+                amount,
+            }) = benched_pokemon.ability_mechanic()
+            {
+                if card.is_type(*energy_type) {
+                    to_subtract += *amount as u8;
                 }
             }
         }
@@ -108,9 +106,8 @@ pub(crate) fn get_retreat_cost(state: &State, card: &PlayedCard) -> Vec<EnergyTy
         }
 
         // Peculiar Plaza: Psychic Pokemon retreat cost is 2 less
-        if let Some(energy_type) = card.get_energy_type() {
-            to_subtract += get_peculiar_plaza_retreat_reduction(state, energy_type);
-        }
+        to_subtract +=
+            get_peculiar_plaza_retreat_reduction(state, card.is_type(EnergyType::Psychic));
 
         // Retreat Effects accumulate so we add them.
         for _ in 0..to_subtract {
