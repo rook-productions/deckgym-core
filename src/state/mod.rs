@@ -708,9 +708,7 @@ impl State {
             .as_ref()
             .expect("There should be a Pokemon to discard");
         let mut cards_to_discard = ko_pokemon.cards_behind.clone();
-        if let Some(tool_card) = &ko_pokemon.attached_tool {
-            cards_to_discard.push(tool_card.clone());
-        }
+        cards_to_discard.extend(ko_pokemon.attached_tools.iter().cloned());
         cards_to_discard.push(ko_pokemon.card.clone());
         debug!("Discarding: {cards_to_discard:?}");
         self.discard_piles[ko_receiver].extend(cards_to_discard);
@@ -729,23 +727,53 @@ impl State {
         let mut cards_to_hand = played_card.cards_behind.clone();
         cards_to_hand.push(played_card.card.clone());
         self.hands[player].extend(cards_to_hand);
-        if let Some(tool_card) = &played_card.attached_tool {
-            self.discard_piles[player].push(tool_card.clone());
-        }
+        self.discard_piles[player].extend(played_card.attached_tools.iter().cloned());
         self.discard_energies[player].extend(played_card.attached_energy.iter().cloned());
         self.refresh_double_grass_bonus_for_player(player);
     }
 
-    /// Removes the attached tool from a Pokémon and puts the tool card into the discard pile.
-    pub(crate) fn discard_tool(&mut self, player: usize, in_play_idx: usize) {
+    /// Removes every Tool attached to a Pokémon and puts them into the discard pile. This is the
+    /// "discard **all** Pokémon Tools" wording (Guzma, Klefki's Dismantling Keys, Weezing's
+    /// Poisonous Extermination). Returns how many Tools were discarded.
+    pub(crate) fn discard_all_tools(&mut self, player: usize, in_play_idx: usize) -> usize {
+        let pokemon = self.in_play_pokemon[player][in_play_idx]
+            .as_mut()
+            .expect("Pokemon should be there if discarding tools");
+        let tools = pokemon.take_tools();
+        let discarded = tools.len();
+        self.discard_piles[player].extend(tools);
+        discarded
+    }
+
+    /// Discards one specific attached Tool by slot. This is the "discard **a** Pokémon Tool card"
+    /// wording (Field Blower), where the player picks which one.
+    pub(crate) fn discard_tool_at(&mut self, player: usize, in_play_idx: usize, tool_idx: usize) {
         let pokemon = self.in_play_pokemon[player][in_play_idx]
             .as_mut()
             .expect("Pokemon should be there if discarding tool");
-        let tool_card = pokemon
-            .attached_tool
-            .take()
-            .expect("Expected tool to be attached when discarding tool");
+        assert!(
+            tool_idx < pokemon.attached_tools.len(),
+            "Expected tool slot {tool_idx} to be occupied when discarding tool"
+        );
+        let tool_card = pokemon.attached_tools.remove(tool_idx);
         self.discard_piles[player].push(tool_card);
+    }
+
+    /// Discards the named Tool from a Pokémon, for Tools that remove *themselves* when they fire
+    /// (Lum Berry, Sitrus Berry) or on a timer (Metal Core Barrier). With two Tool slots the
+    /// sibling Tool has to survive, so these cannot go through `discard_all_tools`.
+    pub(crate) fn discard_tool_by_id(
+        &mut self,
+        player: usize,
+        in_play_idx: usize,
+        tool_id: crate::card_ids::CardId,
+    ) {
+        let pokemon = self.in_play_pokemon[player][in_play_idx]
+            .as_ref()
+            .expect("Pokemon should be there if discarding tool");
+        let tool_idx = crate::tools::tool_position(pokemon, tool_id)
+            .expect("Expected the tool to be attached when discarding it");
+        self.discard_tool_at(player, in_play_idx, tool_idx);
     }
 
     pub(crate) fn discard_from_active(&mut self, actor: usize, to_discard: &[EnergyType]) {
