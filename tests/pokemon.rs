@@ -16,6 +16,8 @@ mod alomomola_hooh_test;
 mod altaria_dragon_arcana_test;
 #[path = "pokemon/ambipom_b1_test.rs"]
 mod ambipom_b1_test;
+#[path = "pokemon/ampharos_zapping_bullet_test.rs"]
+mod ampharos_zapping_bullet_test;
 #[path = "pokemon/applin_share_test.rs"]
 mod applin_share_test;
 #[path = "pokemon/arcanine_test.rs"]
@@ -226,6 +228,8 @@ mod meganium_bloomshine_test;
 mod meowstic_test;
 #[path = "pokemon/meowth_carefree_steps_test.rs"]
 mod meowth_carefree_steps_test;
+#[path = "pokemon/mew_miraculous_memory_test.rs"]
+mod mew_miraculous_memory_test;
 #[path = "pokemon/milotic_ex_aqua_charge_test.rs"]
 mod milotic_ex_aqua_charge_test;
 #[path = "pokemon/miraidon_ex_test.rs"]
@@ -266,6 +270,8 @@ mod psyduck_b4_test;
 mod psyduck_test;
 #[path = "pokemon/purrloin_test.rs"]
 mod purrloin_test;
+#[path = "pokemon/quagsire_amnesia_test.rs"]
+mod quagsire_amnesia_test;
 #[path = "pokemon/raging_bolt_test.rs"]
 mod raging_bolt_test;
 #[path = "pokemon/raichu_evoshock_test.rs"]
