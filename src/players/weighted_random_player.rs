@@ -63,6 +63,7 @@ fn get_weight(action: &SimpleAction) -> u32 {
         SimpleAction::ShuffleOpponentSupporter { .. } => 5,
         SimpleAction::DiscardOpponentSupporter { .. } => 5,
         SimpleAction::DiscardOwnCards { .. } => 5,
+        SimpleAction::PutDiscardCardInHand { .. } => 5,
         SimpleAction::BenchOpponentPokemonFromHand { .. } => 5,
         SimpleAction::AttachFromDiscard { .. } => 10,
         SimpleAction::AttachTypedFromDiscard { .. } => 10,

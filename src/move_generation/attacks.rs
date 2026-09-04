@@ -24,6 +24,21 @@ pub(crate) fn generate_attack_actions(state: &State) -> Vec<SimpleAction> {
             return actions;
         }
 
+        // Regigigas's Seal of Antiquity: "If you don't have Regirock, Regice, and Registeel on
+        // your Bench, this Pokémon can't attack."
+        if let Some(AbilityMechanic::CannotAttackUnlessNamedOnBench { names }) =
+            active_pokemon.ability_mechanic()
+        {
+            let all_on_bench = names.iter().all(|name| {
+                state
+                    .enumerate_bench_pokemon(current_player)
+                    .any(|(_, pokemon)| pokemon.get_name() == *name)
+            });
+            if !all_on_bench {
+                return actions;
+            }
+        }
+
         let restricted_attack_names: Vec<String> = active_effects
             .iter()
             .filter_map(|effect| match effect {

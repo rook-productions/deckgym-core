@@ -116,6 +116,8 @@ mod gallade_test;
 mod game_state_attacks_d_test;
 #[path = "pokemon/gardevoir_psy_turbo_test.rs"]
 mod gardevoir_psy_turbo_test;
+#[path = "pokemon/gholdengo_luxury_coin_test.rs"]
+mod gholdengo_luxury_coin_test;
 #[path = "pokemon/gigalith_ex_megaton_cannon_test.rs"]
 mod gigalith_ex_megaton_cannon_test;
 #[path = "pokemon/giratina_rayquaza_test.rs"]
@@ -298,6 +300,8 @@ mod shinx_hide_test;
 mod silcoon_cascoon_cocoon_collector_test;
 #[path = "pokemon/slither_wing_test.rs"]
 mod slither_wing_test;
+#[path = "pokemon/smeargle_portrait_test.rs"]
+mod smeargle_portrait_test;
 #[path = "pokemon/smoochum_test.rs"]
 mod smoochum_test;
 #[path = "pokemon/snorlax_massive_body_test.rs"]

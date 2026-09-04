@@ -13,7 +13,7 @@ use crate::{
     actions::SimpleAction,
     deck::Deck,
     effects::TurnEffect,
-    models::{Attack, Card, EnergyType, StatusCondition},
+    models::{Card, EnergyType, StatusCondition},
     move_generation,
     stadiums::is_starting_plains_active,
     tools::has_tool,
@@ -46,15 +46,16 @@ pub struct EnergyZone {
 /// search-based players (ExpectiMiniMax, MCTS) that clone and memoize states.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PendingCoinReflip {
-    /// The player who used the attack (and who may use Victory Star).
+    /// The player who took the action (and who may use the reflip Ability).
     pub actor: usize,
-    /// The attack that was used, so it can be re-forecast on either branch.
-    pub attack: Attack,
+    /// The action whose coins were flipped (an attack for Victini's Victory Star, a Trainer card
+    /// for Gholdengo's Luxury Coin), so it can be re-forecast on either branch.
+    pub action: SimpleAction,
     /// The exact coin sequence that was originally flipped. Replayed verbatim if the player
     /// declines, so declining is a faithful "keep what happened" rather than a second draw.
     pub original_flips: Vec<bool>,
-    /// In-play index of the Victini offering the reflip.
-    pub victini_idx: usize,
+    /// In-play index of the Pokémon offering the reflip.
+    pub reflipper_idx: usize,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -91,6 +92,10 @@ pub struct State {
     // not per-Victini.
     #[serde(default)]
     pub(crate) has_used_victory_star: [bool; 2],
+    // Same, for Gholdengo's Luxury Coin ("You can't use more than 1 Luxury Coin Ability each
+    // turn.").
+    #[serde(default)]
+    pub(crate) has_used_luxury_coin: [bool; 2],
     // Set when an eligible coin-flip attack has been flipped but not yet committed, while the
     // acting player decides whether to invoke Victory Star. Holds plain data only (no closures),
     // so `State` stays Clone/Hash/Eq for the search-based players.
@@ -149,6 +154,7 @@ impl State {
             has_retreated: false,
             has_used_stadium: [false, false],
             has_used_victory_star: [false, false],
+            has_used_luxury_coin: [false, false],
             pending_coin_reflip: None,
 
             knocked_out_by_opponent_attack_this_turn: false,
@@ -212,6 +218,29 @@ impl State {
         let jungle_totem_active = has_serperior_jungle_totem(self, player);
         for pokemon in self.in_play_pokemon[player].iter_mut().flatten() {
             pokemon.refresh_double_grass_active(jungle_totem_active);
+        }
+        // A board change can also change the other ability-derived board bonuses, and this is the
+        // one refresh every board mutation already funnels through.
+        self.refresh_ability_board_bonuses();
+    }
+
+    /// Recomputes the cached, board-dependent ability bonuses on every in-play Pokémon:
+    /// Lilligant's Toughness Aroma (+HP for the owner's Pokémon of a type) and Claydol's Heal
+    /// Block (no Pokémon on either side can be healed).
+    pub(crate) fn refresh_ability_board_bonuses(&mut self) {
+        let heal_blocked = (0..2).any(|player| {
+            self.enumerate_in_play_pokemon(player).any(|(_, pokemon)| {
+                pokemon.has_ability(&AbilityMechanic::NoHealingForAnyone)
+            })
+        });
+        let typed_hp_bonuses: [Vec<(EnergyType, u32)>; 2] = [
+            collect_typed_hp_bonuses(self, 0),
+            collect_typed_hp_bonuses(self, 1),
+        ];
+        for (board, bonuses) in self.in_play_pokemon.iter_mut().zip(&typed_hp_bonuses) {
+            for pokemon in board.iter_mut().flatten() {
+                pokemon.refresh_ability_board_bonuses(bonuses, heal_blocked);
+            }
         }
     }
 
@@ -370,6 +399,7 @@ impl State {
         self.has_retreated = false;
         self.has_used_stadium[self.current_player] = false;
         self.has_used_victory_star[self.current_player] = false;
+        self.has_used_luxury_coin[self.current_player] = false;
     }
 
     /// Clear status conditions from energy-bearing Pokémon on a player's side.
@@ -392,15 +422,30 @@ impl State {
         }
     }
 
-    /// In-play index of a Victini whose Victory Star is available to `player` this turn, if any.
-    /// Victory Star has no Active-Spot restriction, so a Victini anywhere in play qualifies.
-    pub(crate) fn available_victory_star_idx(&self, player: usize) -> Option<usize> {
-        if self.has_used_victory_star[player] {
+    /// In-play index of a Pokémon whose coin-reflip Ability (`mechanic`) is available to `player`
+    /// this turn, if any. Neither Victory Star nor Luxury Coin has an Active-Spot restriction, so
+    /// a holder anywhere in play qualifies.
+    pub(crate) fn available_coin_reflip_idx(
+        &self,
+        player: usize,
+        mechanic: &AbilityMechanic,
+    ) -> Option<usize> {
+        if self.coin_reflip_used(player, mechanic)? {
             return None;
         }
         self.enumerate_in_play_pokemon(player)
-            .find(|(_, pokemon)| pokemon.has_ability(&AbilityMechanic::VictoryStarReflip))
+            .find(|(_, pokemon)| pokemon.has_ability(mechanic))
             .map(|(idx, _)| idx)
+    }
+
+    /// Whether `player` has already used this coin-reflip Ability this turn. `None` if `mechanic`
+    /// is not a coin-reflip Ability.
+    fn coin_reflip_used(&self, player: usize, mechanic: &AbilityMechanic) -> Option<bool> {
+        match mechanic {
+            AbilityMechanic::VictoryStarReflip => Some(self.has_used_victory_star[player]),
+            AbilityMechanic::LuxuryCoinReflip => Some(self.has_used_luxury_coin[player]),
+            _ => None,
+        }
     }
 
     pub(crate) fn set_pending_coin_reflip(&mut self, pending: PendingCoinReflip) {
@@ -411,8 +456,12 @@ impl State {
         self.pending_coin_reflip.take()
     }
 
-    pub(crate) fn mark_victory_star_used(&mut self, player: usize) {
-        self.has_used_victory_star[player] = true;
+    pub(crate) fn mark_coin_reflip_used(&mut self, player: usize, mechanic: &AbilityMechanic) {
+        match mechanic {
+            AbilityMechanic::VictoryStarReflip => self.has_used_victory_star[player] = true,
+            AbilityMechanic::LuxuryCoinReflip => self.has_used_luxury_coin[player] = true,
+            _ => {}
+        }
     }
 
     pub(crate) fn set_pending_will_first_heads(&mut self) {
@@ -526,6 +575,12 @@ impl State {
 
         if pokemon.has_ability(&AbilityMechanic::ImmuneToStatusConditions) {
             debug!("Fabled Luster: Pokémon is immune to status conditions");
+            return;
+        }
+
+        // Hoothoot's Insomnia: immune to one specific Special Condition.
+        if pokemon.has_ability(&AbilityMechanic::ImmuneToStatusCondition { condition: status }) {
+            debug!("Pokémon is immune to {status:?}");
             return;
         }
 
@@ -816,6 +871,22 @@ impl State {
     pub fn generate_possible_actions(&self) -> (usize, Vec<crate::actions::Action>) {
         move_generation::generate_possible_actions(self)
     }
+}
+
+/// The (type, +HP) bonuses granted by `player`'s in-play Pokémon (Lilligant's Toughness Aroma).
+fn collect_typed_hp_bonuses(state: &State, player: usize) -> Vec<(EnergyType, u32)> {
+    state
+        .enumerate_in_play_pokemon(player)
+        .filter_map(
+            |(_, pokemon)| match pokemon.ability_mechanic() {
+                Some(AbilityMechanic::IncreaseHpOfYourTypedPokemon {
+                    energy_type,
+                    amount,
+                }) => Some((*energy_type, *amount)),
+                _ => None,
+            },
+        )
+        .collect()
 }
 
 fn format_cards(played_cards: &[Option<PlayedCard>]) -> Vec<String> {
