@@ -330,6 +330,22 @@ fn penny_effect(rng: &mut StdRng, state: &mut State, action: &Action) {
         return;
     }
     let chosen = &candidates[rng.gen_range(0..candidates.len())];
+
+    // The copied Supporter is picked before its play condition is checked, exactly as the card
+    // reads ("a random Supporter card"). If that Supporter could not legally be played right now
+    // — Sabrina with an empty opposing Bench, Erika with no damaged [G] Pokémon — its effect
+    // simply fizzles. This is not just a rules nicety: several effects push their choice list onto
+    // the move-generation stack unconditionally, so running one with no legal target would leave
+    // the game with an empty action list.
+    let is_playable = trainer_move_generation_implementation(state, chosen)
+        .is_some_and(|actions| !actions.is_empty());
+    if !is_playable {
+        debug!(
+            "Penny: {} has no legal target right now, so nothing happens",
+            chosen.name
+        );
+        return;
+    }
     debug!("Penny: Copying the effect of {}", chosen.name);
 
     let (probabilities, mut mutations) =
