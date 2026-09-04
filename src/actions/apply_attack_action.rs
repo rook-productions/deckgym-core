@@ -21,7 +21,7 @@ use crate::{
     effects::{CardEffect, TurnEffect},
     hooks::{
         attack_effect_ignores_opponent_active_effects, can_evolve_into, contains_energy,
-        get_attack_cost, get_extra_random_spread_hits, get_retreat_cost, get_stage,
+        get_effective_attack_cost, get_extra_random_spread_hits, get_retreat_cost, get_stage,
     },
     models::{Attack, Card, EnergyType, StatusCondition, TrainerType},
     tools::has_tool,
@@ -1097,6 +1097,9 @@ fn forecast_effect_attack_by_mechanic(
             pokemon_name,
             *count,
         ),
+        // The cost substitution happens in `hooks::get_effective_attack_cost`; the attack itself
+        // is plain fixed damage.
+        Mechanic::AlternateAttackCost { .. } => active_damage_doutcome(attack.fixed_damage),
         Mechanic::HalveOpponentActiveHp => halve_opponent_active_hp(),
     }
 }
@@ -1445,7 +1448,7 @@ where
             // copy is free (e.g. Mew ex's Genome Hacking).
             if require_attacker_energy_match {
                 let active = state.get_active(acting_player);
-                let modified_cost = get_attack_cost(&attack.energy_required, state, acting_player);
+                let modified_cost = get_effective_attack_cost(&attack, state, acting_player);
                 if !contains_energy(active, &modified_cost, state, acting_player) {
                     continue;
                 }

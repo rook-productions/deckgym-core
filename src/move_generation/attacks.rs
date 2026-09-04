@@ -1,7 +1,7 @@
 use crate::{
     actions::{abilities::AbilityMechanic, has_ability_mechanic, SimpleAction},
     effects::CardEffect,
-    hooks::{contains_energy, get_attack_cost},
+    hooks::{contains_energy, get_effective_attack_cost},
     models::{Attack, PlayedCard},
     State,
 };
@@ -48,7 +48,7 @@ pub(crate) fn generate_attack_actions(state: &State) -> Vec<SimpleAction> {
             if restricted_attack_names.contains(&attack.title) {
                 continue;
             }
-            let modified_cost = get_attack_cost(&attack.energy_required, state, current_player);
+            let modified_cost = get_effective_attack_cost(&attack, state, current_player);
             if contains_energy(active_pokemon, &modified_cost, state, current_player) {
                 offered.push(attack.clone());
                 actions.push(SimpleAction::Attack(attack));

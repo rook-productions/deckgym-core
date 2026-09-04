@@ -12,6 +12,16 @@ pub enum BenchSide {
     BothBenches,
 }
 
+/// Condition under which an attack may be used for a cheaper Energy cost
+/// (see `Mechanic::AlternateAttackCost`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AttackCostCondition {
+    /// Boltund - Defiant Spark: the attacking Pokémon has damage on it.
+    SelfHasDamage,
+    /// Veluza - Shedding Spiral: the attacking player has no cards left in their deck.
+    EmptyDeck,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum CopyAttackSource {
     OpponentActive,
@@ -817,6 +827,14 @@ pub enum Mechanic {
     DiscardOpponentEnergyIfEvolvedFromThisTurn {
         pokemon_name: String,
         count: usize,
+    },
+    /// Boltund - Defiant Spark / Veluza - Shedding Spiral: "this attack can be used for
+    /// <cost>" while `condition` holds. Damage-wise the attack is plain fixed damage; the cost
+    /// substitution happens in `hooks::get_effective_attack_cost`, which move generation and the
+    /// copied-attack affordability check both go through.
+    AlternateAttackCost {
+        condition: AttackCostCondition,
+        cost: Vec<EnergyType>,
     },
     /// Bidoof - Super Fang: halve the opponent's Active Pokémon's remaining HP, rounded down.
     /// Pocket tracks HP in multiples of 10, so the result is rounded down to the nearest 10

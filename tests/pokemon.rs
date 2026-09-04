@@ -12,6 +12,8 @@ mod alolan_sandslash_spike_armor_test;
 mod alomomola_hooh_test;
 #[path = "pokemon/altaria_dragon_arcana_test.rs"]
 mod altaria_dragon_arcana_test;
+#[path = "pokemon/alternate_attack_cost_test.rs"]
+mod alternate_attack_cost_test;
 #[path = "pokemon/ambipom_b1_test.rs"]
 mod ambipom_b1_test;
 #[path = "pokemon/applin_share_test.rs"]

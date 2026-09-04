@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use crate::{
-    actions::attacks::{BenchSide, CopyAttackSource, Mechanic},
+    actions::attacks::{AttackCostCondition, BenchSide, CopyAttackSource, Mechanic},
     card_ids::CardId,
     effects::{CardEffect, TurnEffect},
     models::{EnergyType, StatusCondition, TrainerType},
@@ -1142,7 +1142,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             extra_damage: 70,
         },
     );
-    // map.insert("If this Pokémon has damage on it, this attack can be used for 1 [L] Energy.", todo_implementation);
+    map.insert(
+        "If this Pokémon has damage on it, this attack can be used for 1 [L] Energy.",
+        Mechanic::AlternateAttackCost {
+            condition: AttackCostCondition::SelfHasDamage,
+            cost: vec![EnergyType::Lightning],
+        },
+    );
     map.insert(
         "If this Pokémon has damage on it, this attack does 40 more damage.",
         Mechanic::ExtraDamageIfHurt {
@@ -2345,7 +2351,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             extra_damage: 70,
         },
     );
-    // map.insert("If you have no cards in your deck, this attack can be used for 1 [W] Energy.", todo_implementation);
+    map.insert(
+        "If you have no cards in your deck, this attack can be used for 1 [W] Energy.",
+        Mechanic::AlternateAttackCost {
+            condition: AttackCostCondition::EmptyDeck,
+            cost: vec![EnergyType::Water],
+        },
+    );
     // map.insert("If you played a Supporter card from your hand during this turn, this attack does 60 more damage.", todo_implementation);
     // map.insert("If your Pokémon in play have 3 or more different types of Energy attached, this attack does 60 more damage.", todo_implementation);
     // map.insert("If your opponent's Active Pokémon is a [G] or [M] Pokémon, this attack does 40 more damage.", todo_implementation);
