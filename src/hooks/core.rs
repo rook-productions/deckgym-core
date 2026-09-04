@@ -404,6 +404,37 @@ pub(crate) fn on_end_turn(player_ending_turn: usize, state: &mut State) {
         );
     }
 
+    // Process delayed spot KNOCK OUTS (Armaldo's Abyssal Drop). Like the spot damage above these
+    // target a board position, but they are not damage: whatever occupies the spot is Knocked Out
+    // regardless of damage reduction or prevention.
+    let triggered_spot_knock_outs: Vec<(usize, usize, usize)> = state
+        .get_current_turn_effects()
+        .into_iter()
+        .filter_map(|effect| match effect {
+            TurnEffect::DelayedSpotKnockOut {
+                source_player,
+                target_player,
+                target_in_play_idx,
+            } if target_player == player_ending_turn => {
+                Some((source_player, target_player, target_in_play_idx))
+            }
+            _ => None,
+        })
+        .collect();
+
+    for (source_player, target_player, target_in_play_idx) in triggered_spot_knock_outs {
+        let Some(target) = state.in_play_pokemon[target_player][target_in_play_idx].as_mut() else {
+            continue;
+        };
+        debug!(
+            "Delayed spot knock out: Knocking out player {} slot {}",
+            target_player, target_in_play_idx
+        );
+        let remaining_hp = target.get_remaining_hp();
+        target.apply_damage(remaining_hp);
+        crate::actions::handle_knockouts(state, (source_player, 0), false);
+    }
+
     // Discard Metal Core Barrier from the opponent's Pokémon at the end of this player's turn.
     // ("discard it at the end of your opponent's turn" — the tool owner is the other player)
     let tool_owner = (player_ending_turn + 1) % 2;
@@ -1069,6 +1100,28 @@ fn get_reduced_card_effect_modifiers(
         .sum::<u32>()
 }
 
+/// Aegislash's Superb Shield: like `get_reduced_card_effect_modifiers`, but the reduction only
+/// counts when the attack comes from one of the opponent's Pokémon ex.
+fn get_reduced_from_ex_card_effect_modifiers(
+    state: &State,
+    is_active_to_active: bool,
+    target_player: usize,
+    attacking_pokemon: &crate::models::PlayedCard,
+) -> u32 {
+    if !is_active_to_active || !attacking_pokemon.card.is_ex() {
+        return 0;
+    }
+    state
+        .get_active(target_player)
+        .get_active_effects()
+        .iter()
+        .filter_map(|effect| match effect {
+            CardEffect::ReducedDamageFromEx { amount } => Some(*amount),
+            _ => None,
+        })
+        .sum::<u32>()
+}
+
 fn get_increased_vulnerability_modifiers(
     state: &State,
     is_active_to_active: bool,
@@ -1411,6 +1464,12 @@ pub(crate) fn modify_damage(
         0
     } else {
         get_reduced_card_effect_modifiers(state, is_active_to_active, target_player)
+            + get_reduced_from_ex_card_effect_modifiers(
+                state,
+                is_active_to_active,
+                target_player,
+                attacking_pokemon,
+            )
     };
     let increased_vulnerability_modifiers = if skip_target_effects {
         0

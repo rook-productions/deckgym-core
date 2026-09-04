@@ -14,7 +14,7 @@ use crate::{
         },
         attack_helpers::energy_blender_choices,
     },
-    effects::TurnEffect,
+    effects::{CardEffect, TurnEffect},
     hooks::{
         get_retreat_cost, on_bench_from_hand, on_evolve, to_playable_card, DamageModifierContext,
     },
@@ -191,6 +191,7 @@ pub fn forecast_action(state: &State, action: &Action) -> Outcomes {
         | SimpleAction::Activate { .. }
         | SimpleAction::Retreat(_)
         | SimpleAction::ScheduleDelayedSpotDamage { .. }
+        | SimpleAction::ScheduleDelayedSpotKnockOut { .. }
         | SimpleAction::Heal { .. }
         | SimpleAction::HealAndDiscardEnergy { .. }
         | SimpleAction::MoveAllDamage { .. }
@@ -200,6 +201,7 @@ pub fn forecast_action(state: &State, action: &Action) -> Outcomes {
         | SimpleAction::DiscardOwnBenchedThenDamage { .. }
         | SimpleAction::DiscardOwnBenchedGroupThenDamage { .. }
         | SimpleAction::MoveEnergyAndReoffer { .. }
+        | SimpleAction::DiscardOwnCardsThenDamage { .. }
         | SimpleAction::ReturnPokemonToHand { .. }
         | SimpleAction::ShuffleInPlayPokemonIntoDeck { .. }
         | SimpleAction::DiscardToolFromPokemon { .. }
@@ -460,6 +462,15 @@ fn apply_deterministic_action(rng: &mut StdRng, state: &mut State, action: &Acti
             *target_in_play_idx,
             *amount,
         ),
+        SimpleAction::ScheduleDelayedSpotKnockOut {
+            target_player,
+            target_in_play_idx,
+        } => apply_schedule_delayed_spot_knock_out(
+            state,
+            action.actor,
+            *target_player,
+            *target_in_play_idx,
+        ),
         // Trainer-Specific Actions
         SimpleAction::Heal {
             in_play_idx,
@@ -499,6 +510,19 @@ fn apply_deterministic_action(rng: &mut StdRng, state: &mut State, action: &Acti
             state,
             in_play_indices,
             *damage,
+        ),
+        SimpleAction::DiscardOwnCardsThenDamage {
+            cards,
+            damage,
+            target_player,
+            target_in_play_idx,
+        } => apply_discard_own_cards_then_damage(
+            action.actor,
+            state,
+            cards,
+            *damage,
+            *target_player,
+            *target_in_play_idx,
         ),
         SimpleAction::ReturnPokemonToHand { in_play_idx } => {
             apply_return_pokemon_to_hand(action.actor, state, *in_play_idx)
@@ -831,6 +855,29 @@ fn apply_discard_own_benched_group_then_damage(
     ));
 }
 
+/// Slowking's Litter: discard the chosen Tool cards from hand, then queue the resulting damage so
+/// it goes through the regular damage pipeline as a single application.
+fn apply_discard_own_cards_then_damage(
+    acting_player: usize,
+    state: &mut State,
+    cards: &[Card],
+    damage: u32,
+    target_player: usize,
+    target_in_play_idx: usize,
+) {
+    for card in cards {
+        state.discard_card_from_hand(acting_player, card);
+    }
+    state.move_generation_stack.push((
+        acting_player,
+        vec![SimpleAction::ApplyDamage {
+            attacking_ref: (acting_player, 0),
+            targets: vec![(damage, target_player, target_in_play_idx)],
+            is_from_active_attack: true,
+        }],
+    ));
+}
+
 fn forecast_shuffle_self_and_attachments_into_deck(
     acting_player: usize,
     in_play_idx: usize,
@@ -925,6 +972,22 @@ fn apply_schedule_delayed_spot_damage(
             target_player,
             target_in_play_idx,
             amount,
+        },
+        1,
+    );
+}
+
+fn apply_schedule_delayed_spot_knock_out(
+    state: &mut State,
+    source_player: usize,
+    target_player: usize,
+    target_in_play_idx: usize,
+) {
+    state.add_turn_effect(
+        TurnEffect::DelayedSpotKnockOut {
+            source_player,
+            target_player,
+            target_in_play_idx,
         },
         1,
     );
@@ -1028,6 +1091,41 @@ fn apply_retreat(player: usize, state: &mut State, bench_idx: usize, is_free: bo
     }
 
     apply_activate(player, state, bench_idx);
+
+    if !is_free {
+        apply_snapping_trap_on_retreat(state, player);
+    }
+}
+
+/// Galarian Stunfisk's Snapping Trap: if the player who just retreated faces an Active Pokemon
+/// carrying the effect, the Pokemon they promoted takes the trap's damage. Only a real (paid)
+/// retreat springs the trap; being switched by an effect does not count.
+fn apply_snapping_trap_on_retreat(state: &mut State, retreating_player: usize) {
+    let opponent = (retreating_player + 1) % 2;
+    let Some(trap_damage) = state.maybe_get_active(opponent).and_then(|pokemon| {
+        pokemon
+            .get_active_effects()
+            .iter()
+            .find_map(|effect| match effect {
+                CardEffect::DamageNewActiveOnOpponentRetreat { amount } => Some(*amount),
+                _ => None,
+            })
+    }) else {
+        return;
+    };
+    if state.in_play_pokemon[retreating_player][0].is_none() {
+        return;
+    }
+
+    debug!("Snapping Trap: dealing {trap_damage} to the newly promoted Active Pokemon");
+    handle_damage_only(
+        state,
+        (opponent, 0),
+        &[(trap_damage, retreating_player, 0)],
+        false, // not an attack: no Weakness, counterattacks or Rocky Helmet recoil
+        DamageModifierContext::default(),
+    );
+    handle_knockouts(state, (opponent, 0), false);
 }
 
 // We will replace the PlayedCard, but taking into account the attached energy

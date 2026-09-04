@@ -59,14 +59,22 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Before doing damage, discard all Pokémon Tools from your opponent's Active Pokémon.",
         Mechanic::DiscardOpponentActiveToolsBeforeDamage,
     );
-    // map.insert("Both Active Pokémon are now Asleep.", todo_implementation);
+    map.insert(
+        "Both Active Pokémon are now Asleep.",
+        Mechanic::InflictStatusConditionsOnBothActive {
+            conditions: vec![StatusCondition::Asleep],
+        },
+    );
     map.insert(
         "Both Active Pokémon are now Confused.",
         Mechanic::InflictStatusConditionsOnBothActive {
             conditions: vec![StatusCondition::Confused],
         },
     );
-    // map.insert("Change the type of a random Energy attached to your opponent's Active Pokémon to 1 of the following at random: [G], [R], [W], [L], [P], [F], [D], or [M].", todo_implementation);
+    map.insert(
+        "Change the type of a random Energy attached to your opponent's Active Pokémon to 1 of the following at random: [G], [R], [W], [L], [P], [F], [D], or [M].",
+        Mechanic::RandomizeOpponentActiveEnergyType,
+    );
     map.insert(
         "Change the type of the next Energy that will be generated for your opponent to 1 of the following at random: [G], [R], [W], [L], [P], [F], [D], or [M].",
         Mechanic::RandomizeOpponentNextEnergy,
@@ -127,7 +135,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             energies: vec![EnergyType::Fire, EnergyType::Fire],
         },
     );
-    // map.insert("Discard 2 [R] Energy from this Pokémon. This attack does 80 damage to 1 of your opponent's Pokémon.", todo_implementation);
+    map.insert(
+        "Discard 2 [R] Energy from this Pokémon. This attack does 80 damage to 1 of your opponent's Pokémon.",
+        Mechanic::SelfDiscardEnergyAndDamageAnyOpponentPokemon {
+            energies: vec![EnergyType::Fire, EnergyType::Fire],
+            damage: 80,
+        },
+    );
     map.insert(
         "Discard 2 cards from your hand. If you can't discard 2 cards, this attack does nothing.",
         Mechanic::DiscardHandCards { count: 2 },
@@ -200,15 +214,36 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Discard a random Energy from your opponent's Active Pokémon.",
         Mechanic::DiscardEnergyFromOpponentActive,
     );
-    // map.insert("Discard a random Item card from your opponent's hand.", todo_implementation);
-    // map.insert("Discard a random Pokémon Tool card from your opponent's hand.", todo_implementation);
-    // map.insert("Discard a random card from your opponent's hand.", todo_implementation);
-    // map.insert("Discard all Energy attached to this Pokémon. Your opponent's Active Pokémon is now Paralyzed.", todo_implementation);
+    map.insert(
+        "Discard a random Item card from your opponent's hand.",
+        Mechanic::DiscardRandomOpponentHandCard {
+            trainer_type: Some(TrainerType::Item),
+        },
+    );
+    map.insert(
+        "Discard a random Pokémon Tool card from your opponent's hand.",
+        Mechanic::DiscardRandomOpponentHandCard {
+            trainer_type: Some(TrainerType::Tool),
+        },
+    );
+    map.insert(
+        "Discard a random card from your opponent's hand.",
+        Mechanic::DiscardRandomOpponentHandCard { trainer_type: None },
+    );
+    map.insert(
+        "Discard all Energy attached to this Pokémon. Your opponent's Active Pokémon is now Paralyzed.",
+        Mechanic::SelfDiscardAllEnergyAndInflictStatus {
+            conditions: vec![StatusCondition::Paralyzed],
+        },
+    );
     map.insert(
         "Discard all Energy from this Pokémon.",
         Mechanic::SelfDiscardAllEnergy,
     );
-    // map.insert("Discard all Pokémon Tools from your opponent's Active Pokémon.", todo_implementation);
+    map.insert(
+        "Discard all Pokémon Tools from your opponent's Active Pokémon.",
+        Mechanic::DiscardOpponentActiveToolsBeforeDamage,
+    );
     map.insert(
         "Discard all [L] Energy from this Pokémon. This attack does 120 damage to 1 of your opponent's Pokémon.",
         Mechanic::SelfDiscardAllTypeEnergyAndDamageAnyOpponentPokemon {
@@ -230,13 +265,29 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Discard the top 3 cards of your opponent's deck.",
         Mechanic::DamageAndDiscardOpponentDeck { discard_count: 3 },
     );
-    // map.insert("Discard the top 5 cards of each player's deck.", todo_implementation);
-    // map.insert("Discard the top card of your deck. If that card is a [F] Pokémon, this attack does 60 more damage.", todo_implementation);
+    map.insert(
+        "Discard the top 5 cards of each player's deck.",
+        Mechanic::DiscardTopEachPlayerDeck { count: 5 },
+    );
+    map.insert(
+        "Discard the top card of your deck. If that card is a [F] Pokémon, this attack does 60 more damage.",
+        Mechanic::DiscardTopSelfDeckExtraDamageIfMatch {
+            trainer_type: None,
+            energy_type: Some(EnergyType::Fighting),
+            extra_damage: 60,
+        },
+    );
     map.insert(
         "Discard the top card of your opponent's deck.",
         Mechanic::DamageAndDiscardOpponentDeck { discard_count: 1 },
     );
-    // map.insert("Discard up to 2 Pokémon Tool cards from your hand. This attack does 50 damage for each card you discarded in this way.", todo_implementation);
+    map.insert(
+        "Discard up to 2 Pokémon Tool cards from your hand. This attack does 50 damage for each card you discarded in this way.",
+        Mechanic::DiscardToolsFromHandForDamage {
+            max_cards: 2,
+            damage_per_card: 50,
+        },
+    );
     map.insert("Draw a card.", Mechanic::DrawCard { amount: 1 });
     map.insert(
         "Draw a card for each Poochyena you have in play.",
@@ -244,7 +295,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             name: "Poochyena".to_string(),
         },
     );
-    // map.insert("Draw cards until you have the same number of cards in your hand as your opponent.", todo_implementation);
+    map.insert(
+        "Draw cards until you have the same number of cards in your hand as your opponent.",
+        Mechanic::DrawUntilHandMatchesOpponent,
+    );
     map.insert(
         "During your next turn, this Pokémon can't attack.",
         Mechanic::DamageAndCardEffect {
@@ -362,7 +416,17 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             coin_flip: false,
         },
     );
-    // map.insert("During your opponent's next turn, attacks used by the Defending Pokémon cost 1 [C] more, and its Retreat Cost is 1 [C] more.", todo_implementation);
+    map.insert(
+        "During your opponent's next turn, attacks used by the Defending Pokémon cost 1 [C] more, and its Retreat Cost is 1 [C] more.",
+        Mechanic::DamageAndMultipleCardEffects {
+            opponent: true,
+            effects: vec![
+                CardEffect::IncreasedAttackCost { amount: 1 },
+                CardEffect::IncreasedRetreatCost { amount: 1 },
+            ],
+            duration: 1,
+        },
+    );
     map.insert(
         "During your opponent's next turn, attacks used by the Defending Pokémon cost 1 [C] more.",
         Mechanic::DamageAndCardEffect {
@@ -391,7 +455,15 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         },
     );
     // map.insert("During your opponent's next turn, if the Defending Pokémon tries to use an attack, your opponent flips a coin. If tails, that attack doesn't happen.", todo_implementation);
-    // map.insert("During your opponent's next turn, if they attach Energy from their Energy Zone to the Defending Pokémon, that Pokémon will be Asleep.", todo_implementation);
+    map.insert(
+        "During your opponent's next turn, if they attach Energy from their Energy Zone to the Defending Pokémon, that Pokémon will be Asleep.",
+        Mechanic::DamageAndCardEffect {
+            opponent: true,
+            effect: CardEffect::AsleepWhenEnergyAttachedFromZone,
+            duration: 1,
+            coin_flip: false,
+        },
+    );
     map.insert(
         "During your opponent's next turn, if this Pokémon is damaged by an attack, do 20 damage to the Attacking Pokémon.",
         Mechanic::DamageAndCardEffect {
@@ -512,8 +584,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Flip 2 coins. If both of them are heads, this attack does 100 more damage.",
         Mechanic::ExtraDamageIfBothHeads { extra_damage: 100 },
     );
-    // map.insert("Flip 2 coins. If both of them are heads, your opponent's Active Pokémon is Knocked Out.", todo_implementation);
-    // map.insert("Flip 2 coins. If both of them are tails, this attack does nothing.", todo_implementation);
+    map.insert(
+        "Flip 2 coins. If both of them are heads, your opponent's Active Pokémon is Knocked Out.",
+        Mechanic::AllHeadsKnockOutOpponentActive { num_coins: 2 },
+    );
+    map.insert(
+        "Flip 2 coins. If both of them are tails, this attack does nothing.",
+        Mechanic::NoDamageIfAllTails { num_coins: 2 },
+    );
     map.insert(
         "Flip 2 coins. This attack does 100 damage for each heads.",
         Mechanic::ExtraDamageForEachHeads {
@@ -710,6 +788,12 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         },
     );
     map.insert("Flip a coin for each Energy attached to this Pokémon. This attack does 50 damage for each heads.", Mechanic::CelebiExPowerfulBloom);
+    map.insert(
+        "Flip a coin for each Pokémon you have in play. This attack does 30 damage for each heads.",
+        Mechanic::CoinFlipPerPokemonInPlay {
+            damage_per_head: 30,
+        },
+    );
     map.insert(
         "Flip a coin for each Pokémon you have in play. This attack does 20 damage for each heads.",
         Mechanic::CoinFlipPerPokemonInPlay {
@@ -2050,6 +2134,78 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Your opponent reveals their hand.",
         Mechanic::RevealOpponentHand,
     );
+
+    // ------------------------------------------------------------------------------------------
+    // Attacks whose effect text is not present in the generated skeleton above.
+    // ------------------------------------------------------------------------------------------
+    map.insert(
+        "Before doing damage, shuffle all Pokémon Tools from each of your opponent's Pokémon into their deck.",
+        Mechanic::ShuffleOpponentToolsIntoDeckBeforeDamage,
+    );
+    map.insert(
+        "Discard 3 [W] Energy from this Pokémon, and this attack does 50 damage to each of your opponent's Pokémon.",
+        Mechanic::SelfDiscardEnergyAndDamageAllOpponentPokemon {
+            energies: vec![EnergyType::Water, EnergyType::Water, EnergyType::Water],
+            damage: 50,
+        },
+    );
+    map.insert(
+        "Discard all Energy from this Pokémon. Choose a spot from among your opponent's Active Spot and Bench. At the end of your opponent's next turn, Knock Out the Pokémon in the spot you chose.",
+        Mechanic::SelfDiscardAllEnergyAndDelayedSpotKnockOut,
+    );
+    map.insert(
+        "Discard the top card of your deck, and if that card is an Item, this attack does 20 more damage.",
+        Mechanic::DiscardTopSelfDeckExtraDamageIfMatch {
+            trainer_type: Some(TrainerType::Item),
+            energy_type: None,
+            extra_damage: 20,
+        },
+    );
+    map.insert(
+        "Flip 2 coins. If both of them are heads, discard your opponent's Active Pokémon.",
+        Mechanic::AllHeadsDiscardOpponentActive { num_coins: 2 },
+    );
+    map.insert(
+        "During your next turn, this Pokémon's Overacceleration attack does +70 damage.",
+        Mechanic::DamageAndCardEffect {
+            opponent: false,
+            effect: CardEffect::IncreasedDamageForAttack {
+                attack_name: "Overacceleration".to_string(),
+                amount: 70,
+            },
+            duration: 2,
+            coin_flip: false,
+        },
+    );
+    map.insert(
+        "During your next turn, the Defending Pokémon takes +50 damage from attacks.",
+        Mechanic::DamageAndCardEffect {
+            opponent: true,
+            effect: CardEffect::IncreasedVulnerability { amount: 50 },
+            duration: 2,
+            coin_flip: false,
+        },
+    );
+    map.insert(
+        "During your opponent's next turn, this Pokémon takes +50 damage from attacks.",
+        Mechanic::DamageAndCardEffect {
+            opponent: false,
+            effect: CardEffect::IncreasedVulnerability { amount: 50 },
+            duration: 1,
+            coin_flip: false,
+        },
+    );
+    map.insert(
+        "During your opponent's next turn, attacks used by the Defending Pokémon cost 2 [C] more, and its Retreat Cost is 2 [C] more.",
+        Mechanic::DamageAndMultipleCardEffects {
+            opponent: true,
+            effects: vec![
+                CardEffect::IncreasedAttackCost { amount: 2 },
+                CardEffect::IncreasedRetreatCost { amount: 2 },
+            ],
+            duration: 1,
+        },
+    );
     map.insert(
         "Your opponent reveals their hand. Choose a Supporter card you find there and discard it.",
         Mechanic::DarknessClaw,
@@ -2193,8 +2349,15 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             energies: vec![EnergyType::Fire, EnergyType::Fire, EnergyType::Fire],
         },
     );
-    // map.insert("Discard Water2 [W] Energy from this Pokémon. Your opponent's Active Pokémon is now Paralyzed.", todo_implementation);
-    // map.insert("Discard a Stadium in play.", todo_implementation);
+    // The database text renders the cost as "Water2 [W]", i.e. 2 [W] Energy.
+    map.insert(
+        "Discard Water2 [W] Energy from this Pokémon. Your opponent's Active Pokémon is now Paralyzed.",
+        Mechanic::SelfDiscardEnergyAndInflictStatus {
+            energies: vec![EnergyType::Water, EnergyType::Water],
+            conditions: vec![StatusCondition::Paralyzed],
+        },
+    );
+    map.insert("Discard a Stadium in play.", Mechanic::DiscardStadiumInPlay);
     map.insert(
         "During your next turn, attacks used by your Pokémon do +20 damage to your opponent's Active Pokémon.",
         Mechanic::DamageAndTurnEffect {
@@ -2211,9 +2374,28 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             coin_flip: false,
         },
     );
-    // map.insert("During your opponent's next turn, if this Pokémon is in the Active Spot when your opponent's Active Pokémon retreats, this attack does 40 damage to the new Active Pokémon.", todo_implementation);
-    // map.insert("During your opponent's next turn, this Pokémon takes -80 damage from attacks from your opponent's Pokémon ex.", todo_implementation);
-    // map.insert("Flip 2 coins. If both of them are heads, this attack does 20 more damage.", todo_implementation);
+    map.insert(
+        "During your opponent's next turn, if this Pokémon is in the Active Spot when your opponent's Active Pokémon retreats, this attack does 40 damage to the new Active Pokémon.",
+        Mechanic::DamageAndCardEffect {
+            opponent: false,
+            effect: CardEffect::DamageNewActiveOnOpponentRetreat { amount: 40 },
+            duration: 1,
+            coin_flip: false,
+        },
+    );
+    map.insert(
+        "During your opponent's next turn, this Pokémon takes -80 damage from attacks from your opponent's Pokémon ex.",
+        Mechanic::DamageAndCardEffect {
+            opponent: false,
+            effect: CardEffect::ReducedDamageFromEx { amount: 80 },
+            duration: 1,
+            coin_flip: false,
+        },
+    );
+    map.insert(
+        "Flip 2 coins. If both of them are heads, this attack does 20 more damage.",
+        Mechanic::ExtraDamageIfBothHeads { extra_damage: 20 },
+    );
     map.insert(
         "Flip 2 coins. This attack does 40 more damage for each heads.",
         Mechanic::ExtraDamageForEachHeads {
@@ -2636,7 +2818,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             include_own_bench: false,
         },
     );
-    // map.insert("Discard 2 random Energy from among the Energy attached to all of your Pokémon.", todo_implementation);
+    map.insert(
+        "Discard 2 random Energy from among the Energy attached to all of your Pokémon.",
+        Mechanic::DiscardRandomEnergyFromAllYourPokemon { count: 2 },
+    );
     map.insert(
         "Discard Grass[G] Energy from this Pokémon. Your opponent's Active Pokémon is now Poisoned.",
         Mechanic::SelfDiscardEnergyAndInflictStatus {
@@ -2656,14 +2841,45 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             energy_type: EnergyType::Fire,
         },
     );
-    // map.insert("Discard a [W] Energy from this Pokémon, and this attack also does 40 damage to 1 of your opponent's Benched Pokémon.", todo_implementation);
+    map.insert(
+        "Discard a [W] Energy from this Pokémon, and this attack also does 40 damage to 1 of your opponent's Benched Pokémon.",
+        Mechanic::SelfDiscardEnergyAndChoiceBenchDamage {
+            energies: vec![EnergyType::Water],
+            opponent: true,
+            bench_damage: 40,
+        },
+    );
     map.insert(
         "Discard the top card of your deck.",
         Mechanic::DiscardTopSelfDeck { count: 1 },
     );
-    // map.insert("During your next turn, attacks used by your [F] Pokémon do +30 damage to your opponent's Active Pokémon.", todo_implementation);
-    // map.insert("During your next turn, this Pokémon's Psych Up attack does +30 damage.", todo_implementation);
-    // map.insert("During your opponent's next turn, they can't play any Pokémon from their hand to evolve their Pokémon.", todo_implementation);
+    // Meloetta's Inspiring Dance, the [F]-only analogue of Oricorio's Inspiring Dance above.
+    map.insert(
+        "During your next turn, attacks used by your [F] Pokémon do +30 damage to your opponent's Active Pokémon.",
+        Mechanic::DamageAndTurnEffect {
+            effect: TurnEffect::IncreasedDamageForType {
+                amount: 30,
+                energy_type: EnergyType::Fighting,
+            },
+            duration: 1,
+        },
+    );
+    map.insert(
+        "During your next turn, this Pokémon's Psych Up attack does +30 damage.",
+        Mechanic::DamageAndCardEffect {
+            opponent: false,
+            effect: CardEffect::IncreasedDamageForAttack {
+                attack_name: "Psych Up".to_string(),
+                amount: 30,
+            },
+            duration: 2,
+            coin_flip: false,
+        },
+    );
+    map.insert(
+        "During your opponent's next turn, they can't play any Pokémon from their hand to evolve their Pokémon.",
+        Mechanic::PreventOpponentEvolutionNextTurn,
+    );
     map.insert(
         "During your opponent's next turn, this Pokémon takes +20 damage from attacks.",
         Mechanic::DamageAndCardEffect {

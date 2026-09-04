@@ -1250,6 +1250,75 @@ fn forecast_effect_attack_by_mechanic(
             )
         }
         Mechanic::HalveOpponentActiveHp => halve_opponent_active_hp(),
+        Mechanic::DiscardRandomOpponentHandCard { trainer_type } => {
+            discard_random_opponent_hand_card(attack.fixed_damage, trainer_type.clone())
+        }
+        Mechanic::ShuffleOpponentToolsIntoDeckBeforeDamage => {
+            shuffle_opponent_tools_into_deck_before_damage(attack.fixed_damage)
+        }
+        Mechanic::DiscardStadiumInPlay => discard_stadium_in_play(attack.fixed_damage),
+        Mechanic::RandomizeOpponentActiveEnergyType => {
+            randomize_opponent_active_energy_type(attack.fixed_damage)
+        }
+        Mechanic::DiscardRandomEnergyFromAllYourPokemon { count } => {
+            discard_random_energy_from_all_your_pokemon(attack.fixed_damage, *count)
+        }
+        Mechanic::SelfDiscardEnergyAndDamageAnyOpponentPokemon { energies, damage } => {
+            self_discard_energy_and_damage_any_opponent_pokemon(energies.clone(), *damage)
+        }
+        Mechanic::SelfDiscardEnergyAndDamageAllOpponentPokemon { energies, damage } => {
+            self_discard_energy_and_damage_all_opponent_pokemon(state, energies.clone(), *damage)
+        }
+        Mechanic::SelfDiscardEnergyAndChoiceBenchDamage {
+            energies,
+            opponent,
+            bench_damage,
+        } => self_discard_energy_and_choice_bench_damage(
+            state,
+            attack.fixed_damage,
+            energies.clone(),
+            *opponent,
+            *bench_damage,
+        ),
+        Mechanic::SelfDiscardAllEnergyAndInflictStatus { conditions } => {
+            self_discard_all_energy_and_inflict_status(attack.fixed_damage, conditions.clone())
+        }
+        Mechanic::SelfDiscardAllEnergyAndDelayedSpotKnockOut => {
+            self_discard_all_energy_and_delayed_spot_knock_out()
+        }
+        Mechanic::DiscardTopEachPlayerDeck { count } => {
+            discard_top_each_player_deck(attack.fixed_damage, *count)
+        }
+        Mechanic::DiscardTopSelfDeckExtraDamageIfMatch {
+            trainer_type,
+            energy_type,
+            extra_damage,
+        } => discard_top_self_deck_extra_damage_if_match(
+            state,
+            attack.fixed_damage,
+            trainer_type.clone(),
+            *energy_type,
+            *extra_damage,
+        ),
+        Mechanic::DiscardToolsFromHandForDamage {
+            max_cards,
+            damage_per_card,
+        } => discard_tools_from_hand_for_damage(state, *max_cards, *damage_per_card),
+        Mechanic::DrawUntilHandMatchesOpponent => {
+            draw_until_hand_matches_opponent(attack.fixed_damage)
+        }
+        Mechanic::AllHeadsKnockOutOpponentActive { num_coins } => {
+            all_heads_knock_out_opponent_active(*num_coins)
+        }
+        Mechanic::AllHeadsDiscardOpponentActive { num_coins } => {
+            all_heads_discard_opponent_active(*num_coins)
+        }
+        Mechanic::NoDamageIfAllTails { num_coins } => {
+            no_damage_if_all_tails(attack.fixed_damage, *num_coins)
+        }
+        Mechanic::PreventOpponentEvolutionNextTurn => {
+            prevent_opponent_evolution_next_turn(attack.fixed_damage)
+        }
     }
 }
 
@@ -1644,6 +1713,208 @@ fn optional_discard_benched_type_for_extra_damage(
     })
 }
 
+// ---------------------------------------------------------------------------------------------
+// attacks-a batch helpers
+// ---------------------------------------------------------------------------------------------
+
+/// True when `card` is the kind of card `trainer_type` asks for. `None` matches any card.
+fn hand_card_matches_trainer_type(card: &Card, trainer_type: &Option<TrainerType>) -> bool {
+    match trainer_type {
+        None => true,
+        Some(wanted) => match card {
+            Card::Trainer(trainer_card) => trainer_card.trainer_card_type == *wanted,
+            Card::Pokemon(_) => false,
+        },
+    }
+}
+
+/// Alolan Raticate / Alolan Meowth / Houndoom / Shiftry: discard one random matching card from
+/// the opponent's hand. If nothing in the hand matches, only the damage happens.
+fn discard_random_opponent_hand_card(
+    damage: u32,
+    trainer_type: Option<TrainerType>,
+) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |rng, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        let candidates: Vec<usize> = state.hands[opponent]
+            .iter()
+            .enumerate()
+            .filter(|(_, card)| hand_card_matches_trainer_type(card, &trainer_type))
+            .map(|(idx, _)| idx)
+            .collect();
+        if candidates.is_empty() {
+            return;
+        }
+        let hand_idx = candidates[rng.gen_range(0..candidates.len())];
+        let card = state.hands[opponent].remove(hand_idx);
+        state.discard_piles[opponent].push(card);
+    })
+}
+
+/// Hoopa's Mischievous Ring: shuffle every Tool on the opponent's board into their deck. Done
+/// before damage so that damage modifiers (Rocky Helmet, Giant Cape HP, ...) see the cleared board.
+fn shuffle_opponent_tools_into_deck_before_damage(damage: u32) -> AttackOutcomes {
+    AttackOutcomes::single(AttackOutcome::effect_then_damage(
+        move |rng, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            let mut shuffled_any = false;
+            for in_play_idx in 0..state.in_play_pokemon[opponent].len() {
+                let tool = state.in_play_pokemon[opponent][in_play_idx]
+                    .as_mut()
+                    .and_then(|pokemon| pokemon.attached_tool.take());
+                if let Some(tool) = tool {
+                    state.decks[opponent].cards.push(tool);
+                    shuffled_any = true;
+                }
+            }
+            if shuffled_any {
+                state.decks[opponent].shuffle(false, rng);
+            }
+        },
+        vec![(damage, true, 0)],
+    ))
+}
+
+/// Machop's Shatter / Conkeldurr's Bedrock Breaker: discard the Stadium in play, if any.
+fn discard_stadium_in_play(damage: u32) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |_, state, action| {
+        if let Some((stadium, owner)) = state.take_active_stadium() {
+            // A Stadium returns to the discard pile of the player who put it into play, matching
+            // `SimpleAction::DiscardActiveStadium` (Field Blower).
+            state.discard_piles[owner.unwrap_or(action.actor)].push(stadium);
+        }
+    })
+}
+
+/// Smeargle's Splatter Coating: re-roll one random Energy on the opponent's Active Pokémon into
+/// one of the 8 Energy Zone types, uniformly at random (the new type may equal the old one).
+fn randomize_opponent_active_energy_type(damage: u32) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |rng, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        let Some(active) = state.in_play_pokemon[opponent][0].as_mut() else {
+            return;
+        };
+        if active.attached_energy.is_empty() {
+            return;
+        }
+        let energy_idx = rng.gen_range(0..active.attached_energy.len());
+        let selectable = EnergyType::SELECTABLE;
+        active.attached_energy[energy_idx] = selectable[rng.gen_range(0..selectable.len())];
+    })
+}
+
+/// Groudon's Gaia Blast: discard `count` random Energy from among the Energy attached to the
+/// attacker's own Pokémon. Each discard is weighted by how much Energy a Pokémon holds, so that
+/// every individual Energy on the board is equally likely — the same weighting
+/// `DiscardRandomGlobalEnergy` uses, restricted to one side of the board.
+fn discard_random_energy_from_all_your_pokemon(damage: u32, count: usize) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |rng, state, action| {
+        for _ in 0..count {
+            let candidates: Vec<(usize, usize)> = state
+                .enumerate_in_play_pokemon(action.actor)
+                .filter(|(_, pokemon)| !pokemon.attached_energy.is_empty())
+                .map(|(in_play_idx, pokemon)| (in_play_idx, pokemon.attached_energy.len()))
+                .collect();
+            if candidates.is_empty() {
+                return;
+            }
+
+            let total_energy: usize = candidates.iter().map(|(_, count)| count).sum();
+            let mut roll = rng.gen_range(0..total_energy);
+            let mut selected_idx = candidates[0].0;
+            for (in_play_idx, energy_count) in &candidates {
+                if roll < *energy_count {
+                    selected_idx = *in_play_idx;
+                    break;
+                }
+                roll -= energy_count;
+            }
+
+            let pokemon = state.in_play_pokemon[action.actor][selected_idx]
+                .as_mut()
+                .expect("Pokemon with energy should still be there");
+            let energy_idx = rng.gen_range(0..pokemon.attached_energy.len());
+            let energy = pokemon.attached_energy.remove(energy_idx);
+            state.discard_energies[action.actor].push(energy);
+        }
+    })
+}
+
+/// Volcarona's Volcanic Ash: discard the listed Energy from the attacker, then let it pick any
+/// one of the opponent's Pokémon to take `damage`.
+fn self_discard_energy_and_damage_any_opponent_pokemon(
+    energies: Vec<EnergyType>,
+    damage: u32,
+) -> AttackOutcomes {
+    active_damage_effect_doutcome(0, move |_, state, action| {
+        discard_requested_energy_from_active_best_effort(state, action.actor, &energies);
+        push_direct_damage_choices(state, action, damage, false);
+    })
+}
+
+/// Kyogre's Tidal Blast: discard the listed Energy from the attacker, then hit every one of the
+/// opponent's Pokémon for `damage`.
+fn self_discard_energy_and_damage_all_opponent_pokemon(
+    state: &State,
+    energies: Vec<EnergyType>,
+    damage: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let targets: Vec<DamageTarget> = state
+        .enumerate_in_play_pokemon(opponent)
+        .map(|(in_play_idx, _)| (damage, true, in_play_idx))
+        .collect();
+    AttackOutcomes::single(AttackOutcome::effect_then_damage(
+        move |_, state, action| {
+            discard_requested_energy_from_active_best_effort(state, action.actor, &energies);
+        },
+        targets,
+    ))
+}
+
+/// Rapid Strike Urshifu's Tornado Shot: discard the listed Energy from the attacker, then deal
+/// the Active damage plus a chosen Benched hit as one damage application.
+fn self_discard_energy_and_choice_bench_damage(
+    state: &State,
+    active_damage: u32,
+    energies: Vec<EnergyType>,
+    opponent: bool,
+    bench_damage: u32,
+) -> AttackOutcomes {
+    let opponent_player = (state.current_player + 1) % 2;
+    let bench_target = if opponent {
+        opponent_player
+    } else {
+        state.current_player
+    };
+    let choices: Vec<SimpleAction> = state
+        .enumerate_bench_pokemon(bench_target)
+        .map(|(in_play_idx, _)| SimpleAction::ApplyDamage {
+            attacking_ref: (state.current_player, 0),
+            targets: vec![
+                (active_damage, opponent_player, 0),
+                (bench_damage, bench_target, in_play_idx),
+            ],
+            is_from_active_attack: true,
+        })
+        .collect();
+
+    if choices.is_empty() {
+        // No Benched target to choose: the Energy is still discarded and the Active still takes
+        // the attack's damage.
+        return active_damage_effect_doutcome(active_damage, move |_, state, action| {
+            discard_requested_energy_from_active_best_effort(state, action.actor, &energies);
+        });
+    }
+
+    AttackOutcomes::single_effect(move |_, state, action| {
+        discard_requested_energy_from_active_best_effort(state, action.actor, &energies);
+        state
+            .move_generation_stack
+            .push((action.actor, choices.clone()));
+    })
+}
+
 /// Whether the attacking Pokémon evolved from a Pokémon named `pokemon_name` during this turn.
 /// Checks the card directly underneath, so evolving via Rare Candy (which skips the named
 /// Stage 1) does not qualify.
@@ -1912,6 +2183,217 @@ fn damage_only_if_moved_from_bench(state: &State, base: u32) -> AttackOutcomes {
         .get_active(state.current_player)
         .moved_to_active_this_turn;
     active_damage_doutcome(if moved { base } else { 0 })
+}
+
+/// Galvantula's Electric Shock: discard every Energy from the attacker and inflict the listed
+/// Special Conditions on the opponent's Active Pokémon.
+fn self_discard_all_energy_and_inflict_status(
+    damage: u32,
+    conditions: Vec<StatusCondition>,
+) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |_, state, action| {
+        let active = state.get_active_mut(action.actor);
+        let discarded = std::mem::take(&mut active.attached_energy);
+        state.discard_energies[action.actor].extend(discarded);
+
+        let opponent = (action.actor + 1) % 2;
+        for condition in &conditions {
+            state.apply_status_condition(opponent, 0, *condition);
+        }
+    })
+}
+
+/// Armaldo's Abyssal Drop: discard every Energy from the attacker, then let it choose a spot on
+/// the opponent's board whose occupant is Knocked Out at the end of the opponent's next turn.
+fn self_discard_all_energy_and_delayed_spot_knock_out() -> AttackOutcomes {
+    active_damage_effect_doutcome(0, move |_, state, action| {
+        let active = state.get_active_mut(action.actor);
+        let discarded = std::mem::take(&mut active.attached_energy);
+        state.discard_energies[action.actor].extend(discarded);
+
+        let opponent = (action.actor + 1) % 2;
+        let choices: Vec<SimpleAction> = state
+            .enumerate_in_play_pokemon(opponent)
+            .map(
+                |(in_play_idx, _)| SimpleAction::ScheduleDelayedSpotKnockOut {
+                    target_player: opponent,
+                    target_in_play_idx: in_play_idx,
+                },
+            )
+            .collect();
+        if !choices.is_empty() {
+            state.move_generation_stack.push((action.actor, choices));
+        }
+    })
+}
+
+/// Ultra Necrozma ex's Shoegaze: mill the top `count` cards of both decks.
+fn discard_top_each_player_deck(damage: u32, count: usize) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |_, state, action| {
+        for player in [action.actor, (action.actor + 1) % 2] {
+            for _ in 0..count {
+                let Some(card) = state.decks[player].draw() else {
+                    break;
+                };
+                state.discard_piles[player].push(card);
+            }
+        }
+    })
+}
+
+/// True when the milled card satisfies the attack's bonus condition. Exactly one of
+/// `trainer_type` / `energy_type` is set by the mapping.
+fn milled_card_matches(
+    card: &Card,
+    trainer_type: &Option<TrainerType>,
+    energy_type: Option<EnergyType>,
+) -> bool {
+    if let Some(wanted) = trainer_type {
+        return matches!(card, Card::Trainer(trainer) if trainer.trainer_card_type == *wanted);
+    }
+    if let Some(wanted) = energy_type {
+        return card.get_type() == Some(wanted);
+    }
+    false
+}
+
+/// Pachirisu's Crackling Snap / Dugtrio's Cliff Crumbler: mill the top card of the attacker's own
+/// deck; if it matches, the attack does `extra_damage` more.
+///
+/// The bonus is resolved deterministically off the current deck order, the same way
+/// `SimpleAction::DrawCard` is: the engine models the deck as an ordered, known list rather than
+/// as a distribution, so branching on a probability here would decorrelate the damage dealt from
+/// the card actually milled within a single game.
+fn discard_top_self_deck_extra_damage_if_match(
+    state: &State,
+    fixed_damage: u32,
+    trainer_type: Option<TrainerType>,
+    energy_type: Option<EnergyType>,
+    extra_damage: u32,
+) -> AttackOutcomes {
+    let bonus = state.decks[state.current_player]
+        .cards
+        .first()
+        .is_some_and(|card| milled_card_matches(card, &trainer_type, energy_type));
+
+    let damage = if bonus {
+        fixed_damage + extra_damage
+    } else {
+        fixed_damage
+    };
+
+    // Mill before damage so the discard pile (which other cards count) is settled first.
+    AttackOutcomes::single(AttackOutcome::effect_then_damage(
+        |_, state, action| {
+            if let Some(card) = state.decks[action.actor].draw() {
+                state.discard_piles[action.actor].push(card);
+            }
+        },
+        vec![(damage, true, 0)],
+    ))
+}
+
+/// Slowking's Litter: the player chooses how many (0..=`max_cards`) Pokémon Tool cards to discard
+/// from hand; the attack does `damage_per_card` for each one. Each choice is a single action that
+/// discards the cards and applies the resulting damage, so the damage is modified once.
+fn discard_tools_from_hand_for_damage(
+    state: &State,
+    max_cards: usize,
+    damage_per_card: u32,
+) -> AttackOutcomes {
+    let acting_player = state.current_player;
+    let tools: Vec<Card> = state.hands[acting_player]
+        .iter()
+        .filter(|card| matches!(card, Card::Trainer(t) if t.trainer_card_type == TrainerType::Tool))
+        .cloned()
+        .collect();
+    let affordable = max_cards.min(tools.len());
+
+    AttackOutcomes::single_effect(move |_, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        // "up to" — discarding nothing (and so dealing no damage) is always a legal choice.
+        let mut choices: Vec<SimpleAction> = vec![SimpleAction::Noop];
+        for count in 1..=affordable {
+            for combo in generate_combinations(&tools, count) {
+                choices.push(SimpleAction::DiscardOwnCardsThenDamage {
+                    cards: combo,
+                    damage: damage_per_card * count as u32,
+                    target_player: opponent,
+                    target_in_play_idx: 0,
+                });
+            }
+        }
+        state.move_generation_stack.push((action.actor, choices));
+    })
+}
+
+/// Aipom's Imitate: draw until the attacker's hand is as large as the opponent's.
+fn draw_until_hand_matches_opponent(damage: u32) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |_, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        while state.hands[action.actor].len() < state.hands[opponent].len() {
+            let before = state.hands[action.actor].len();
+            state.maybe_draw_card(action.actor);
+            if state.hands[action.actor].len() == before {
+                break; // empty deck, or the 10-card hand limit
+            }
+        }
+    })
+}
+
+/// Bewear's Superpowered Hug: all heads Knocks Out the opponent's Active Pokémon (dealing exactly
+/// its remaining HP, so the knockout goes through the normal scoring path).
+fn all_heads_knock_out_opponent_active(num_coins: usize) -> AttackOutcomes {
+    AttackOutcomes::binomial_by_heads(num_coins, move |heads| {
+        if heads == num_coins {
+            AttackOutcome::effect_only(|_, state, action| {
+                let opponent = (action.actor + 1) % 2;
+                let opponent_active = state.get_active_mut(opponent);
+                let remaining_hp = opponent_active.get_remaining_hp();
+                opponent_active.apply_damage(remaining_hp);
+            })
+        } else {
+            AttackOutcome::noop()
+        }
+    })
+}
+
+/// Scream Tail's Shooing Shout: all heads sends the opponent's Active Pokémon (and everything
+/// attached) to the discard pile without scoring a point, then makes them promote a replacement.
+fn all_heads_discard_opponent_active(num_coins: usize) -> AttackOutcomes {
+    AttackOutcomes::binomial_by_heads(num_coins, move |heads| {
+        if heads == num_coins {
+            AttackOutcome::effect_only(|_, state, action| {
+                let opponent = (action.actor + 1) % 2;
+                if state.in_play_pokemon[opponent][0].is_none() {
+                    return;
+                }
+                state.discard_from_play(opponent, 0);
+                state.trigger_promotion_or_declare_winner(opponent);
+            })
+        } else {
+            AttackOutcome::noop()
+        }
+    })
+}
+
+/// Malamar's Evolution Jammer: stop the opponent evolving from hand during their next turn.
+fn prevent_opponent_evolution_next_turn(damage: u32) -> AttackOutcomes {
+    active_damage_effect_doutcome(damage, move |_, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        state.add_turn_effect(TurnEffect::NoEvolutionFromHand { player: opponent }, 1);
+    })
+}
+
+/// Druddigon's Giga Claw: all tails and the attack does nothing at all.
+fn no_damage_if_all_tails(damage: u32, num_coins: usize) -> AttackOutcomes {
+    AttackOutcomes::binomial_by_heads(num_coins, move |heads| {
+        if heads == 0 {
+            active_damage_outcome(0)
+        } else {
+            active_damage_outcome(damage)
+        }
+    })
 }
 
 fn copy_attack(

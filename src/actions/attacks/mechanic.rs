@@ -739,6 +739,101 @@ pub enum Mechanic {
         attack_name: String,
         damage_per: u32,
     },
+    // ---------------------------------------------------------------------------------------------
+    // attacks-a batch
+    // ---------------------------------------------------------------------------------------------
+    /// Alolan Raticate / Alolan Meowth / Houndoom / Shiftry: discard one random card from the
+    /// opponent's hand. `trainer_type` narrows the pool to a kind of Trainer card
+    /// (`Some(Item)`, `Some(Tool)`); `None` picks from the whole hand.
+    DiscardRandomOpponentHandCard {
+        trainer_type: Option<TrainerType>,
+    },
+    /// Hoopa's Mischievous Ring: before doing damage, shuffle every Pokémon Tool attached to any
+    /// of the opponent's Pokémon back into their deck (unlike
+    /// `DiscardOpponentActiveToolsBeforeDamage`, which discards and only touches the Active).
+    ShuffleOpponentToolsIntoDeckBeforeDamage,
+    /// Machop's Shatter / Conkeldurr's Bedrock Breaker: discard the Stadium in play, if any.
+    /// Stadium effects apply to both players, so there is no choice to make.
+    DiscardStadiumInPlay,
+    /// Smeargle's Splatter Coating: re-roll the type of one random Energy attached to the
+    /// opponent's Active Pokémon into one of the 8 basic Energy types, uniformly at random.
+    RandomizeOpponentActiveEnergyType,
+    /// Groudon's Gaia Blast: discard `count` random Energy from among the Energy attached to the
+    /// attacker's OWN Pokémon (the one-sided twin of `DiscardRandomGlobalEnergy`).
+    DiscardRandomEnergyFromAllYourPokemon {
+        count: usize,
+    },
+    /// Volcarona's Volcanic Ash: discard the listed Energy from the attacking Pokémon, then deal
+    /// `damage` to 1 of the opponent's Pokémon of the attacker's choice. The fixed-Energy twin of
+    /// `SelfDiscardAllTypeEnergyAndDamageAnyOpponentPokemon`.
+    SelfDiscardEnergyAndDamageAnyOpponentPokemon {
+        energies: Vec<EnergyType>,
+        damage: u32,
+    },
+    /// Kyogre's Tidal Blast: discard the listed Energy from the attacking Pokémon, then deal
+    /// `damage` to EVERY one of the opponent's Pokémon.
+    SelfDiscardEnergyAndDamageAllOpponentPokemon {
+        energies: Vec<EnergyType>,
+        damage: u32,
+    },
+    /// Rapid Strike Urshifu's Tornado Shot: discard the listed Energy from the attacking Pokémon,
+    /// deal the attack's `fixed_damage` to the Defending Pokémon, and also deal `bench_damage` to
+    /// 1 chosen Benched Pokémon.
+    SelfDiscardEnergyAndChoiceBenchDamage {
+        energies: Vec<EnergyType>,
+        opponent: bool,
+        bench_damage: u32,
+    },
+    /// Galvantula's Electric Shock: discard ALL Energy from the attacking Pokémon and inflict the
+    /// listed Special Conditions on the opponent's Active Pokémon.
+    SelfDiscardAllEnergyAndInflictStatus {
+        conditions: Vec<StatusCondition>,
+    },
+    /// Armaldo's Abyssal Drop: discard all Energy from the attacking Pokémon, then choose a spot
+    /// among the opponent's Active Spot and Bench; whatever occupies that spot at the end of the
+    /// opponent's next turn is Knocked Out outright. The knock-out twin of `DelayedSpotDamage`.
+    SelfDiscardAllEnergyAndDelayedSpotKnockOut,
+    /// Ultra Necrozma ex's Shoegaze: discard the top `count` cards of BOTH players' decks.
+    DiscardTopEachPlayerDeck {
+        count: usize,
+    },
+    /// Pachirisu's Crackling Snap / Dugtrio's Cliff Crumbler: discard the top card of the
+    /// attacker's own deck; if it matches, the attack does `extra_damage` more. The card matches
+    /// when it is a Trainer of `trainer_type`, or a Pokémon of `energy_type` — exactly one of the
+    /// two is set.
+    DiscardTopSelfDeckExtraDamageIfMatch {
+        trainer_type: Option<TrainerType>,
+        energy_type: Option<EnergyType>,
+        extra_damage: u32,
+    },
+    /// Slowking's Litter: discard up to `max_cards` Pokémon Tool cards from your hand, dealing
+    /// `damage_per_card` for each one discarded this way (the player picks how many).
+    DiscardToolsFromHandForDamage {
+        max_cards: usize,
+        damage_per_card: u32,
+    },
+    /// Aipom's Imitate: draw until your hand holds as many cards as your opponent's.
+    DrawUntilHandMatchesOpponent,
+    /// Bewear's Superpowered Hug: flip `num_coins`; if every one is heads, the opponent's Active
+    /// Pokémon is Knocked Out (so the attacker scores the point).
+    AllHeadsKnockOutOpponentActive {
+        num_coins: usize,
+    },
+    /// Scream Tail's Shooing Shout: flip `num_coins`; if every one is heads, the opponent's
+    /// Active Pokémon is DISCARDED — it leaves play with its attached cards but scores no point,
+    /// unlike `AllHeadsKnockOutOpponentActive`.
+    AllHeadsDiscardOpponentActive {
+        num_coins: usize,
+    },
+    /// Druddigon's Giga Claw: flip `num_coins`; if every one is tails the attack does nothing at
+    /// all, otherwise it deals its plain `fixed_damage`.
+    NoDamageIfAllTails {
+        num_coins: usize,
+    },
+    /// Malamar's Evolution Jammer: during the opponent's next turn they can't play Pokémon from
+    /// their hand to evolve. The opponent's index is only known when the attack resolves, so this
+    /// is its own variant rather than a `DamageAndTurnEffect` carrying a fixed player.
+    PreventOpponentEvolutionNextTurn,
     /// Emolga (Windup Thunder) / Dedenne ex (Dede-Circuit):
     /// deal `damage_per` damage for each Pokémon Tool attached to any of your
     /// Pokémon in play (active + bench).

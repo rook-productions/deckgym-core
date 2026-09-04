@@ -50,6 +50,7 @@ fn get_weight(action: &SimpleAction) -> u32 {
         SimpleAction::Attack(_) => 10,
         SimpleAction::ApplyDamage { .. } => 10,
         SimpleAction::ScheduleDelayedSpotDamage { .. } => 10,
+        SimpleAction::ScheduleDelayedSpotKnockOut { .. } => 10,
         SimpleAction::Retreat(_) => 2,
         SimpleAction::EndTurn => 1,
         SimpleAction::Heal { .. } => 5,
@@ -75,6 +76,7 @@ fn get_weight(action: &SimpleAction) -> u32 {
         SimpleAction::DiscardOwnBenchedGroupThenDamage { .. } => 5, // Same trade, several Pokemon at once
         SimpleAction::ShuffleSelfAndAttachmentsIntoDeck { .. } => 5,
         SimpleAction::MoveEnergyAndReoffer { .. } => 5,
+        SimpleAction::DiscardOwnCardsThenDamage { .. } => 5,   // Trading hand Tools for damage
 
         SimpleAction::ReturnPokemonToHand { .. } => 5,
         SimpleAction::ShuffleInPlayPokemonIntoDeck { .. } => 5,
