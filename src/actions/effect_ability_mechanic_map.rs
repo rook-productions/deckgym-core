@@ -144,9 +144,18 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             AbilityMechanic::NoRetreatIfHasEnergy,
         );
         // map.insert("If this Pokémon has full HP, it takes -40 damage from attacks from your opponent's Pokémon.", todo_implementation);
-        // map.insert("If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, do 10 damage to each of your opponent's Pokémon.", todo_implementation);
-        // map.insert("If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, do 50 damage to the Attacking Pokémon.", todo_implementation);
-        // map.insert("If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, flip a coin. If heads, the Attacking Pokémon is Knocked Out.", todo_implementation);
+        map.insert(
+            "If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, do 10 damage to each of your opponent's Pokémon.",
+            AbilityMechanic::DamageEachOpponentPokemonOnKnockout { amount: 10 },
+        );
+        map.insert(
+            "If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, do 50 damage to the Attacking Pokémon.",
+            AbilityMechanic::DamageAttackerOnKnockout { amount: 50 },
+        );
+        map.insert(
+            "If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, flip a coin. If heads, the Attacking Pokémon is Knocked Out.",
+            AbilityMechanic::CoinFlipKnockOutAttackerOnKnockout,
+        );
         map.insert(
             "If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, move all [F] Energy from this Pokémon to 1 of your Benched Pokémon.",
             AbilityMechanic::MoveAllTypedEnergyToBenchOnKnockout {
@@ -455,7 +464,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
                 attacker_types: vec![EnergyType::Fire, EnergyType::Water],
             },
         );
-        // map.insert("When this Pokémon is Knocked Out, flip a coin. If heads, your opponent can't get any points for it.", todo_implementation);
+        map.insert(
+            "When this Pokémon is Knocked Out, flip a coin. If heads, your opponent can't get any points for it.",
+            AbilityMechanic::CoinFlipDenyPointsOnKnockout,
+        );
         map.insert(
             "When this Pokémon is first damaged by an attack after coming into play, prevent that damage.",
             AbilityMechanic::PreventFirstAttack,
@@ -615,6 +627,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
         );
 
         // b4 / b4a mechanics
+        map.insert(
+            "If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, do 70 damage to the Attacking Pokémon.",
+            AbilityMechanic::DamageAttackerOnKnockout { amount: 70 },
+        );
         map.insert(
             "If you have another Beldum in play, this Pokémon's Retreat Cost is 2 less.",
             AbilityMechanic::ReduceRetreatCostIfAnotherSameNameInPlay { amount: 2 },

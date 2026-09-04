@@ -291,6 +291,12 @@ fn forecast_ability_by_mechanic(
         AbilityMechanic::CounterattackDamage { .. } => {
             panic!("CounterattackDamage is a passive ability")
         }
+        AbilityMechanic::DamageAttackerOnKnockout { .. }
+        | AbilityMechanic::DamageEachOpponentPokemonOnKnockout { .. }
+        | AbilityMechanic::CoinFlipKnockOutAttackerOnKnockout
+        | AbilityMechanic::CoinFlipDenyPointsOnKnockout => {
+            panic!("Knockout retaliation mechanics are passive abilities")
+        }
         AbilityMechanic::PoisonAttackerOnDamaged => {
             panic!("PoisonAttackerOnDamaged is a passive ability")
         }

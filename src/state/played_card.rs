@@ -42,6 +42,12 @@ pub struct PlayedCard {
     pub cards_behind: Vec<Card>,
     pub prevent_first_attack_damage_used: bool,
     pub has_attacked_since_play: bool,
+    /// Set when a "when this Pokémon is Knocked Out, flip a coin; if heads your opponent can't
+    /// get any points for it" ability (Dusknoir's Fade into Darkness, Glimmora's Shattering
+    /// Crystal) came up heads for the Knock Out about to be resolved. Read (and then irrelevant,
+    /// since the card leaves play) by `handle_knockouts`.
+    #[serde(default)]
+    pub(crate) knockout_points_denied: bool,
 
     /// Effects that should be cleared if moved to the bench (by retreat or similar).
     /// The second value is the number of turns left for the effect.
@@ -77,6 +83,7 @@ impl PlayedCard {
             effects: vec![],
             prevent_first_attack_damage_used: false,
             has_attacked_since_play: false,
+            knockout_points_denied: false,
         }
     }
 
@@ -382,6 +389,10 @@ impl PlayedCard {
                 false
             }
         });
+
+        // A points-denial coin flip that didn't end up mattering (the Knock Out was prevented)
+        // must not carry over to a later Knock Out.
+        self.knockout_points_denied = false;
 
         // Reset played_this_turn, moved_to_active_this_turn, and ability_used
         self.played_this_turn = false;

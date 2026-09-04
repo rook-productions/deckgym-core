@@ -29,7 +29,7 @@ use crate::{
 };
 
 use super::{
-    attack_outcome::{AttackOutcome, AttackOutcomes, DamageTarget},
+    attack_outcome::{AttackOutcome, AttackOutcomes, DamageTarget, KnockoutCoinEffect},
     mutations::{
         active_damage_doutcome, active_damage_effect_doutcome, active_damage_effect_outcome,
         active_damage_outcome, build_status_effect, damage_effect_doutcome,
@@ -95,7 +95,8 @@ fn apply_attack_common_modifiers(
     }
 
     outcomes = apply_defender_damage_prevention_if_needed(acting_player, state, attack, outcomes);
-    apply_defender_guts_if_needed(acting_player, state, attack, outcomes)
+    outcomes = apply_defender_guts_if_needed(acting_player, state, attack, outcomes);
+    apply_defender_knockout_coin_flips(acting_player, state, attack, outcomes)
 }
 
 fn apply_copied_attack_modifiers(
@@ -106,7 +107,8 @@ fn apply_copied_attack_modifiers(
 ) -> AttackOutcomes {
     let outcomes =
         apply_defender_damage_prevention_if_needed(acting_player, state, attack, base_outcomes);
-    apply_defender_guts_if_needed(acting_player, state, attack, outcomes)
+    let outcomes = apply_defender_guts_if_needed(acting_player, state, attack, outcomes);
+    apply_defender_knockout_coin_flips(acting_player, state, attack, outcomes)
 }
 
 fn apply_defender_damage_prevention_if_needed(
@@ -182,6 +184,59 @@ fn apply_defender_guts_if_needed(
         attack.effect.as_deref(),
         &guts_indices,
     )
+}
+
+/// Defender abilities that flip a coin when this attack would Knock the defender Out:
+/// Galarian Cursola's Perish Body (heads knocks out the Attacking Pokémon) and Dusknoir's Fade
+/// into Darkness / Glimmora's Shattering Crystal (heads denies the opponent the points).
+///
+/// Perish Body is restricted to the Active Spot by its card text; the points-denial abilities
+/// have no positional restriction, so every in-play slot is eligible.
+fn apply_defender_knockout_coin_flips(
+    acting_player: usize,
+    state: &State,
+    attack: &Attack,
+    outcomes: AttackOutcomes,
+) -> AttackOutcomes {
+    let opponent = (acting_player + 1) % 2;
+    let mut perish_body_indices: Vec<usize> = Vec::new();
+    let mut deny_points_indices: Vec<usize> = Vec::new();
+    for (idx, pokemon) in state.enumerate_in_play_pokemon(opponent) {
+        match pokemon
+            .card
+            .get_ability()
+            .and_then(|a| ability_mechanic_from_effect(&a.effect))
+        {
+            Some(AbilityMechanic::CoinFlipKnockOutAttackerOnKnockout) if idx == 0 => {
+                perish_body_indices.push(idx)
+            }
+            Some(AbilityMechanic::CoinFlipDenyPointsOnKnockout) => deny_points_indices.push(idx),
+            _ => {}
+        }
+    }
+
+    let mut outcomes = outcomes;
+    if !perish_body_indices.is_empty() {
+        outcomes = outcomes.split_with_knockout_coin_flip(
+            state,
+            acting_player,
+            Some(&attack.title),
+            attack.effect.as_deref(),
+            &perish_body_indices,
+            KnockoutCoinEffect::KnockOutAttacker,
+        );
+    }
+    if !deny_points_indices.is_empty() {
+        outcomes = outcomes.split_with_knockout_coin_flip(
+            state,
+            acting_player,
+            Some(&attack.title),
+            attack.effect.as_deref(),
+            &deny_points_indices,
+            KnockoutCoinEffect::DenyPoints,
+        );
+    }
+    outcomes
 }
 
 fn forecast_attack_inner(state: &State, attack: &Attack) -> AttackOutcomes {

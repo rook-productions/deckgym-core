@@ -280,6 +280,28 @@ pub enum AbilityMechanic {
     CounterattackDamage {
         amount: u32,
     },
+    /// Pyukumuku's Innards Out / Team Rocket's Electrode's Destiny Burst: "If this Pokémon is in
+    /// the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon,
+    /// do `amount` damage to the Attacking Pokémon." Passive; resolved alongside the ordinary
+    /// counterattack recoil in `handle_damage_only`.
+    DamageAttackerOnKnockout {
+        amount: u32,
+    },
+    /// Spiritomb's Final Scream: same trigger as `DamageAttackerOnKnockout`, but the damage is
+    /// dealt to *each* of the attacking player's in-play Pokémon (Active and Benched).
+    DamageEachOpponentPokemonOnKnockout {
+        amount: u32,
+    },
+    /// Galarian Cursola's Perish Body: "If this Pokémon is in the Active Spot and is Knocked Out
+    /// by damage from an attack from your opponent's Pokémon, flip a coin. If heads, the
+    /// Attacking Pokémon is Knocked Out." Passive; resolved as a defender-side coin split on the
+    /// attack's outcomes (`AttackOutcomes::split_with_knockout_coin_flip`).
+    CoinFlipKnockOutAttackerOnKnockout,
+    /// Dusknoir's Fade into Darkness / Glimmora's Shattering Crystal: "When this Pokémon is
+    /// Knocked Out, flip a coin. If heads, your opponent can't get any points for it." Passive;
+    /// resolved as a defender-side coin split on the attack's outcomes. Only Knock Outs caused by
+    /// an opponent's attack flip — see the note on `split_with_knockout_coin_flip`.
+    CoinFlipDenyPointsOnKnockout,
     PoisonAttackerOnDamaged,
     /// Jellicent's Bouncy Body: if this Pokémon is in the Active Spot and is damaged by an attack
     /// from the opponent's Pokémon, its owner takes an Energy of `energy_type` from their Energy
