@@ -1175,8 +1175,20 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             extra_damage: 60,
         },
     );
-    // map.insert("If you have exactly 1, 3, or 5 cards in your hand, this attack does 60 more damage.", todo_implementation);
-    // map.insert("If you have exactly 2, 4, or 6 cards in your hand, this attack does 30 more damage.", todo_implementation);
+    map.insert(
+        "If you have exactly 1, 3, or 5 cards in your hand, this attack does 60 more damage.",
+        Mechanic::ExtraDamageIfHandSizeIn {
+            hand_sizes: vec![1, 3, 5],
+            extra_damage: 60,
+        },
+    );
+    map.insert(
+        "If you have exactly 2, 4, or 6 cards in your hand, this attack does 30 more damage.",
+        Mechanic::ExtraDamageIfHandSizeIn {
+            hand_sizes: vec![2, 4, 6],
+            extra_damage: 30,
+        },
+    );
     map.insert(
         "If you played a Supporter card from your hand during this turn, this attack does 50 more damage.",
         Mechanic::ExtraDamageIfSupportPlayedThisTurn { extra_damage: 50 },
@@ -2139,7 +2151,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             extra_damage: 50,
         },
     );
-    // map.insert("If this Pokémon has more Energy attached than your opponent's Active Pokémon, this attack does 50 more damage.", todo_implementation);
+    map.insert(
+        "If this Pokémon has more Energy attached than your opponent's Active Pokémon, this attack does 50 more damage.",
+        Mechanic::ExtraDamageIfMoreEnergyThanOpponent { extra_damage: 50 },
+    );
     map.insert(
         "If this Pokémon moved from your Bench to the Active Spot this turn, this attack does 40 more damage.",
         Mechanic::ExtraDamageIfMovedFromBench { extra_damage: 40 },
@@ -2152,7 +2167,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             extra_damage: 60,
         },
     );
-    // map.insert("If you have fewer Pokémon in play than your opponent, this attack does 80 more damage.", todo_implementation);
+    map.insert(
+        "If you have fewer Pokémon in play than your opponent, this attack does 80 more damage.",
+        Mechanic::ExtraDamageIfFewerPokemonInPlay { extra_damage: 80 },
+    );
     // map.insert("If your opponent has gotten exactly 1 points, this attack does 40 more damage.", todo_implementation);
     // map.insert("If your opponent's Active Pokémon has damage on it, this attack does 50 more damage.", todo_implementation);
     map.insert(
@@ -2272,7 +2290,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         },
     );
     map.insert("Flip 3 coins. For each heads, discard a random Energy from your opponent's Active Pokémon.", Mechanic::CoinFlipsDiscardEnergyFromOpponentActive { num_coins: 3 });
-    // map.insert("If this Pokémon's remaining HP is 60 or less, this attack does nothing.", todo_implementation);
+    map.insert(
+        "If this Pokémon's remaining HP is 60 or less, this attack does nothing.",
+        Mechanic::NoDamageIfSelfHpAtMost { threshold: 60 },
+    );
     map.insert(
         "If you have 4 or more [L] Energy in play, this attack does 70 more damage.",
         Mechanic::ExtraDamageIfTypeEnergyInPlay {
@@ -2711,6 +2732,41 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             extra_damage: 80,
             opponent: false,
         },
+    );
+    // Mr. Mime - Synchro Dance
+    map.insert(
+        "If this Pokémon and your opponent's Active Pokémon have the same amount of Energy attached, this attack does 40 more damage.",
+        Mechanic::ExtraDamageIfSameEnergyCountAsOpponent { extra_damage: 40 },
+    );
+    // Enamorus - Smitten Strike
+    map.insert(
+        "If this Pokémon and your opponent's Active Pokémon have 1 or more of the same type of Energy attached, this attack does 60 more damage.",
+        Mechanic::ExtraDamageIfSharedEnergyTypeWithOpponent { extra_damage: 60 },
+    );
+    // Kecleon - Samesies Slap
+    map.insert(
+        "If this Pokémon and your opponent's Active Pokémon have 1 or more of the same type of Energy attached, this attack does 30 more damage.",
+        Mechanic::ExtraDamageIfSharedEnergyTypeWithOpponent { extra_damage: 30 },
+    );
+    // Team Rocket's Lapras - Ruthless Whirlpool
+    map.insert(
+        "If this Pokémon has more Energy attached than your opponent's Active Pokémon, this attack does 40 more damage.",
+        Mechanic::ExtraDamageIfMoreEnergyThanOpponent { extra_damage: 40 },
+    );
+    // Chimecho - Extrasensory
+    map.insert(
+        "If you have the same number of cards in your hand as your opponent, this attack does 40 more damage.",
+        Mechanic::ExtraDamageIfSameHandSizeAsOpponent { extra_damage: 40 },
+    );
+    // Pheromosa - Prelude
+    map.insert(
+        "If you haven't gotten any points, this attack does 60 more damage.",
+        Mechanic::ExtraDamageIfNoPoints { extra_damage: 60 },
+    );
+    // Flutter Mane - Hexing Flight
+    map.insert(
+        "If this Pokémon didn't move from the Bench to the Active Spot this turn, this attack does nothing.",
+        Mechanic::DamageOnlyIfMovedFromBench,
     );
     map
 });

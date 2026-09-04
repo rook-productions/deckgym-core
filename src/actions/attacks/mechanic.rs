@@ -724,4 +724,50 @@ pub enum Mechanic {
     DamagePerOwnToolAttached {
         damage_per: u32,
     },
+
+    // ---------------------------------------------------------------------------------------
+    // Coverage batch B
+    // ---------------------------------------------------------------------------------------
+    /// Mr. Mime - Synchro Dance: extra damage when this Pokémon and the opponent's Active
+    /// Pokémon have the same amount of Energy attached.
+    ExtraDamageIfSameEnergyCountAsOpponent {
+        extra_damage: u32,
+    },
+    /// Enamorus - Smitten Strike / Kecleon - Samesies Slap: extra damage when this Pokémon and
+    /// the opponent's Active Pokémon have 1 or more of the same type of Energy attached.
+    ExtraDamageIfSharedEnergyTypeWithOpponent {
+        extra_damage: u32,
+    },
+    /// Team Rocket's Lapras - Ruthless Whirlpool / Scrafty - Crush the Weak: extra damage when
+    /// this Pokémon has strictly more Energy attached than the opponent's Active Pokémon.
+    ExtraDamageIfMoreEnergyThanOpponent {
+        extra_damage: u32,
+    },
+    /// Ludicolo - Rhythmic Steps / Luvdisc - Paired Tackle: extra damage when the attacker's
+    /// hand holds exactly one of `hand_sizes` cards.
+    ExtraDamageIfHandSizeIn {
+        hand_sizes: Vec<usize>,
+        extra_damage: u32,
+    },
+    /// Chimecho - Extrasensory: extra damage when both players hold the same number of cards.
+    ExtraDamageIfSameHandSizeAsOpponent {
+        extra_damage: u32,
+    },
+    /// Tyrantrum - Tyrannical Fang: extra damage when the attacker has fewer Pokémon in play
+    /// (Active plus Bench) than their opponent.
+    ExtraDamageIfFewerPokemonInPlay {
+        extra_damage: u32,
+    },
+    /// Pheromosa - Prelude: extra damage while the attacker has not gotten any points.
+    ExtraDamageIfNoPoints {
+        extra_damage: u32,
+    },
+    /// Ting-Lu - Arrogant Impact: the attack does nothing when the attacking Pokémon's remaining
+    /// HP is at most `threshold`. The mirror image of `ExtraDamageIfSelfHpAtMost`.
+    NoDamageIfSelfHpAtMost {
+        threshold: u32,
+    },
+    /// Flutter Mane - Hexing Flight: the attack does nothing unless this Pokémon moved from the
+    /// Bench to the Active Spot this turn.
+    DamageOnlyIfMovedFromBench,
 }

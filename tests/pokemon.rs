@@ -28,6 +28,8 @@ mod azurill_spritzee_test;
 mod bellossom_a4_test;
 #[path = "pokemon/blastoise_double_splash_test.rs"]
 mod blastoise_double_splash_test;
+#[path = "pokemon/board_state_conditional_attacks_test.rs"]
+mod board_state_conditional_attacks_test;
 #[path = "pokemon/bombirdier_test.rs"]
 mod bombirdier_test;
 #[path = "pokemon/bonsly_teary_attack_test.rs"]
@@ -94,6 +96,8 @@ mod eelektross_energy_crush_test;
 mod emboar_flare_storm_test;
 #[path = "pokemon/emolga_dedenne_ex_tool_damage_test.rs"]
 mod emolga_dedenne_ex_tool_damage_test;
+#[path = "pokemon/energy_comparison_attacks_test.rs"]
+mod energy_comparison_attacks_test;
 #[path = "pokemon/entei_test.rs"]
 mod entei_test;
 #[path = "pokemon/farigiraf_dipplin_test.rs"]

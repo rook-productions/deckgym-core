@@ -1031,7 +1031,141 @@ fn forecast_effect_attack_by_mechanic(
             damage_per,
         } => damage_per_own_pokemon_with_attack_name(state, attack_name, *damage_per),
         Mechanic::HealEqualToDamageDealt => heal_equal_to_damage_dealt_attack(attack.fixed_damage),
+        Mechanic::ExtraDamageIfSameEnergyCountAsOpponent { extra_damage } => {
+            extra_damage_if_same_energy_count_as_opponent(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfSharedEnergyTypeWithOpponent { extra_damage } => {
+            extra_damage_if_shared_energy_type_with_opponent(
+                state,
+                attack.fixed_damage,
+                *extra_damage,
+            )
+        }
+        Mechanic::ExtraDamageIfMoreEnergyThanOpponent { extra_damage } => {
+            extra_damage_if_more_energy_than_opponent(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfHandSizeIn {
+            hand_sizes,
+            extra_damage,
+        } => extra_damage_if_hand_size_in(state, attack.fixed_damage, hand_sizes, *extra_damage),
+        Mechanic::ExtraDamageIfSameHandSizeAsOpponent { extra_damage } => {
+            extra_damage_if_same_hand_size_as_opponent(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfFewerPokemonInPlay { extra_damage } => {
+            extra_damage_if_fewer_pokemon_in_play(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::ExtraDamageIfNoPoints { extra_damage } => {
+            extra_damage_if_no_points(state, attack.fixed_damage, *extra_damage)
+        }
+        Mechanic::NoDamageIfSelfHpAtMost { threshold } => {
+            no_damage_if_self_hp_at_most(state, attack.fixed_damage, *threshold)
+        }
+        Mechanic::DamageOnlyIfMovedFromBench => {
+            damage_only_if_moved_from_bench(state, attack.fixed_damage)
+        }
     }
+}
+
+/// Number of Energy attached to `player`'s Active Pokémon.
+fn active_energy_count(state: &State, player: usize) -> usize {
+    state.get_active(player).attached_energy.len()
+}
+
+/// Mr. Mime - Synchro Dance.
+fn extra_damage_if_same_energy_count_as_opponent(
+    state: &State,
+    base: u32,
+    extra: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let same =
+        active_energy_count(state, state.current_player) == active_energy_count(state, opponent);
+    active_damage_doutcome(if same { base + extra } else { base })
+}
+
+/// Enamorus - Smitten Strike / Kecleon - Samesies Slap.
+fn extra_damage_if_shared_energy_type_with_opponent(
+    state: &State,
+    base: u32,
+    extra: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let defender_energy = &state.get_active(opponent).attached_energy;
+    let shares_type = state
+        .get_active(state.current_player)
+        .attached_energy
+        .iter()
+        .any(|energy| defender_energy.contains(energy));
+    active_damage_doutcome(if shares_type { base + extra } else { base })
+}
+
+/// Team Rocket's Lapras - Ruthless Whirlpool / Scrafty - Crush the Weak.
+fn extra_damage_if_more_energy_than_opponent(
+    state: &State,
+    base: u32,
+    extra: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let has_more =
+        active_energy_count(state, state.current_player) > active_energy_count(state, opponent);
+    active_damage_doutcome(if has_more { base + extra } else { base })
+}
+
+/// Ludicolo - Rhythmic Steps / Luvdisc - Paired Tackle.
+fn extra_damage_if_hand_size_in(
+    state: &State,
+    base: u32,
+    hand_sizes: &[usize],
+    extra: u32,
+) -> AttackOutcomes {
+    let hand_size = state.hands[state.current_player].len();
+    let matches = hand_sizes.contains(&hand_size);
+    active_damage_doutcome(if matches { base + extra } else { base })
+}
+
+/// Chimecho - Extrasensory.
+fn extra_damage_if_same_hand_size_as_opponent(
+    state: &State,
+    base: u32,
+    extra: u32,
+) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let same = state.hands[state.current_player].len() == state.hands[opponent].len();
+    active_damage_doutcome(if same { base + extra } else { base })
+}
+
+/// Tyrantrum - Tyrannical Fang.
+fn extra_damage_if_fewer_pokemon_in_play(state: &State, base: u32, extra: u32) -> AttackOutcomes {
+    let opponent = (state.current_player + 1) % 2;
+    let own = state
+        .enumerate_in_play_pokemon(state.current_player)
+        .count();
+    let theirs = state.enumerate_in_play_pokemon(opponent).count();
+    active_damage_doutcome(if own < theirs { base + extra } else { base })
+}
+
+/// Pheromosa - Prelude.
+fn extra_damage_if_no_points(state: &State, base: u32, extra: u32) -> AttackOutcomes {
+    let has_no_points = state.points[state.current_player] == 0;
+    active_damage_doutcome(if has_no_points { base + extra } else { base })
+}
+
+/// Ting-Lu - Arrogant Impact.
+fn no_damage_if_self_hp_at_most(state: &State, base: u32, threshold: u32) -> AttackOutcomes {
+    let attacker = state.get_active(state.current_player);
+    active_damage_doutcome(if attacker.get_remaining_hp() <= threshold {
+        0
+    } else {
+        base
+    })
+}
+
+/// Flutter Mane - Hexing Flight.
+fn damage_only_if_moved_from_bench(state: &State, base: u32) -> AttackOutcomes {
+    let moved = state
+        .get_active(state.current_player)
+        .moved_to_active_this_turn;
+    active_damage_doutcome(if moved { base } else { 0 })
 }
 
 fn copy_attack(
