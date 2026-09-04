@@ -204,17 +204,6 @@ impl PlayedCard {
         self.damage_counters = self.damage_counters.saturating_add(damage);
     }
 
-    /// This Pokémon's **printed** (base) type, ignoring anything granted in play. Prefer
-    /// `is_type` / `get_energy_types` for rules questions — see the table on `get_energy_types`
-    /// for which checks are which.
-    // Option because if playing an item card... (?)
-    pub(crate) fn get_energy_type(&self) -> Option<EnergyType> {
-        match &self.card {
-            Card::Pokemon(pokemon_card) => Some(pokemon_card.energy_type),
-            _ => None,
-        }
-    }
-
     /// Every Energy type this Pokémon counts as **while in play**: the printed type(s) of its
     /// card (`Card::get_types`) plus any type granted by its Ability
     /// (`AbilityMechanic::GrantedTypes`, i.e. Urshifu's Double Type). The list is deduplicated
@@ -293,8 +282,7 @@ impl PlayedCard {
     /// Pokemon's owner. Called by `State::refresh_double_grass_bonus_for_player` whenever
     /// the owner's board composition changes.
     pub(crate) fn refresh_double_grass_active(&mut self, jungle_totem_active_for_owner: bool) {
-        self.double_grass_active =
-            jungle_totem_active_for_owner && self.card.get_type() == Some(EnergyType::Grass);
+        self.double_grass_active = jungle_totem_active_for_owner && self.is_type(EnergyType::Grass);
     }
 
     /// Keeps the ability-derived board bonuses in sync. Called by
@@ -304,16 +292,13 @@ impl PlayedCard {
         typed_hp_bonuses: &[(EnergyType, u32)],
         heal_blocked: bool,
     ) {
-        self.ability_hp_bonus = self
-            .get_energy_type()
-            .map(|own_type| {
-                typed_hp_bonuses
-                    .iter()
-                    .filter(|(energy_type, _)| *energy_type == own_type)
-                    .map(|(_, amount)| *amount)
-                    .sum()
-            })
-            .unwrap_or(0);
+        // One bonus per source ability, even if this Pokemon counts as several of the boosted
+        // types at once.
+        self.ability_hp_bonus = typed_hp_bonuses
+            .iter()
+            .filter(|(energy_type, _)| self.is_type(*energy_type))
+            .map(|(_, amount)| *amount)
+            .sum();
         self.heal_blocked = heal_blocked;
     }
 
@@ -350,9 +335,7 @@ impl PlayedCard {
         // attachable to anything, but their HP bonus is gated by the holder).
         if has_tool(self, CardId::A2147GiantCape) {
             effective_hp += 20;
-        } else if has_tool(self, CardId::A3147LeafCape)
-            && self.get_energy_type() == Some(EnergyType::Grass)
-        {
+        } else if has_tool(self, CardId::A3147LeafCape) && self.is_type(EnergyType::Grass) {
             // Leaf Cape: "The [G] Pokémon this card is attached to gets +30 HP."
             effective_hp += 30;
         } else if has_tool(self, CardId::B3b065ElegantCape)
@@ -624,9 +607,8 @@ impl PlayedCard {
     }
 
     pub(crate) fn has_double_grass(&self, state: &State, player: usize) -> bool {
-        let pokemon_type = self.card.get_type();
         let jungle_totem_active = has_serperior_jungle_totem(state, player);
-        jungle_totem_active && pokemon_type == Some(EnergyType::Grass)
+        jungle_totem_active && self.is_type(EnergyType::Grass)
     }
 }
 

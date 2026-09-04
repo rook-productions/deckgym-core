@@ -625,7 +625,7 @@ impl State {
         // Steel Apron: "The [M] Pokémon this card is attached to ... can't be affected by any
         // Special Conditions." The immunity only applies to a [M] holder.
         if has_tool(pokemon, crate::card_ids::CardId::A4153SteelApron)
-            && pokemon.get_energy_type() == Some(EnergyType::Metal)
+            && pokemon.is_type(EnergyType::Metal)
         {
             debug!("Steel Apron: Pokémon is immune to status conditions");
             return;
@@ -692,7 +692,7 @@ impl State {
 
     pub(crate) fn num_in_play_of_type(&self, player: usize, energy: EnergyType) -> usize {
         self.enumerate_in_play_pokemon(player)
-            .filter(|(_, x)| x.get_energy_type() == Some(energy))
+            .filter(|(_, x)| x.is_type(energy))
             .count()
     }
 
@@ -857,14 +857,9 @@ impl State {
         }
     }
 
-    pub(crate) fn record_knocked_out_by_opponent_attack(
-        &mut self,
-        energy_type: Option<EnergyType>,
-    ) {
+    pub(crate) fn record_knocked_out_by_opponent_attack(&mut self, energy_types: &[EnergyType]) {
         self.knocked_out_by_opponent_attack_this_turn = true;
-        if let Some(energy_type) = energy_type {
-            self.knocked_out_types_this_turn.insert(energy_type);
-        }
+        self.knocked_out_types_this_turn.extend(energy_types);
     }
 
     /// Records that one of `player`'s own Pokemon was Knocked Out (for Kingambit's Overlord's

@@ -920,9 +920,7 @@ fn parasol_lady_effect(acting_player: usize, state: &State) -> Outcomes {
     // Put 1 of your [W] Pokémon in play, except any Pokémon ex, into your hand.
     let choices: Vec<SimpleAction> = state
         .enumerate_in_play_pokemon(acting_player)
-        .filter(|(_, pokemon)| {
-            pokemon.get_energy_type() == Some(EnergyType::Water) && !pokemon.card.is_ex()
-        })
+        .filter(|(_, pokemon)| pokemon.is_type(EnergyType::Water) && !pokemon.card.is_ex())
         .map(|(in_play_idx, _)| SimpleAction::ReturnPokemonToHand { in_play_idx })
         .collect();
 
@@ -1061,7 +1059,7 @@ fn electric_generator_outcomes() -> Outcomes {
     let heads_mutation = Box::new(|_: &mut StdRng, state: &mut State, action: &Action| {
         let possible_moves = state
             .enumerate_bench_pokemon(action.actor)
-            .filter(|(_, pokemon)| pokemon.get_energy_type() == Some(EnergyType::Lightning))
+            .filter(|(_, pokemon)| pokemon.is_type(EnergyType::Lightning))
             .map(|(in_play_idx, _)| SimpleAction::Attach {
                 attachments: vec![(1, EnergyType::Lightning, in_play_idx)],
                 is_turn_energy: false,
@@ -1089,7 +1087,7 @@ fn inner_healing_effect(
 ) {
     let possible_moves = state
         .enumerate_in_play_pokemon(action.actor)
-        .filter(|(_, x)| energy.is_none() || x.get_energy_type() == Some(EnergyType::Grass))
+        .filter(|(_, x)| energy.is_none() || x.is_type(EnergyType::Grass))
         .map(|(i, _)| SimpleAction::Heal {
             in_play_idx: i,
             amount,
@@ -1110,7 +1108,7 @@ fn misty_outcomes() -> Outcomes {
         Box::new(move |_: &mut StdRng, state: &mut State, action: &Action| {
             let possible_moves = state
                 .enumerate_in_play_pokemon(action.actor)
-                .filter(|(_, x)| x.get_energy_type() == Some(EnergyType::Water))
+                .filter(|(_, x)| x.is_type(EnergyType::Water))
                 .map(|(i, _)| SimpleAction::Attach {
                     attachments: vec![(heads as u32, EnergyType::Water, i)],
                     is_turn_energy: false,

@@ -1495,7 +1495,7 @@ fn switch_self_with_bench_of_type(
 ) -> AttackOutcomes {
     let choices: Vec<_> = state
         .enumerate_bench_pokemon(state.current_player)
-        .filter(|(_, pokemon)| pokemon.get_energy_type() == Some(energy_type))
+        .filter(|(_, pokemon)| pokemon.is_type(energy_type))
         .map(|(in_play_idx, _)| SimpleAction::Activate {
             player: state.current_player,
             in_play_idx,
@@ -1786,7 +1786,7 @@ fn optional_discard_benched_type_for_extra_damage(
 ) -> AttackOutcomes {
     let eligible: Vec<usize> = state
         .enumerate_bench_pokemon(state.current_player)
-        .filter(|(_, pokemon)| pokemon.get_energy_type() == Some(energy_type))
+        .filter(|(_, pokemon)| pokemon.is_type(energy_type))
         .map(|(idx, _)| idx)
         .collect();
 
@@ -2897,7 +2897,7 @@ fn moltres_inferno_dance() -> AttackOutcomes {
             // First collect all eligible fire pokemon in bench
             let mut fire_bench_idx = Vec::new();
             for (in_play_idx, pokemon) in state.enumerate_bench_pokemon(action.actor) {
-                if pokemon.get_energy_type() == Some(EnergyType::Fire) {
+                if pokemon.is_type(EnergyType::Fire) {
                     fire_bench_idx.push(in_play_idx);
                 }
             }
@@ -3157,7 +3157,7 @@ pub(crate) fn energy_bench_attack(
     let choices = state
         .enumerate_bench_pokemon(state.current_player)
         .filter(|(_, played_card)| {
-            target_benched_type.is_none() || played_card.get_energy_type() == target_benched_type
+            target_benched_type.is_none_or(|energy| played_card.is_type(energy))
         })
         .map(|(in_play_idx, _)| SimpleAction::Attach {
             attachments: energies
@@ -3348,9 +3348,7 @@ fn bench_count_damage_attack(
     let bench_count = players
         .iter()
         .flat_map(|&player| state.enumerate_bench_pokemon(player))
-        .filter(|(_, pokemon)| {
-            energy_type.is_none_or(|energy| pokemon.get_energy_type() == Some(energy))
-        })
+        .filter(|(_, pokemon)| energy_type.is_none_or(|energy| pokemon.is_type(energy)))
         .count() as u32;
 
     let total_damage = if include_base_damage {
@@ -4004,7 +4002,7 @@ fn heal_all_pokemon(
     energy_type: Option<EnergyType>,
 ) {
     for pokemon in state.in_play_pokemon[player].iter_mut().flatten() {
-        if energy_type.is_none() || pokemon.get_energy_type() == energy_type {
+        if energy_type.is_none_or(|energy| pokemon.is_type(energy)) {
             pokemon.heal(amount);
         }
     }
@@ -4704,9 +4702,7 @@ fn benched_basic_indices_of_type(
 ) -> Vec<usize> {
     state
         .enumerate_bench_pokemon(player)
-        .filter(|(_, pokemon)| {
-            pokemon.card.is_basic() && pokemon.get_energy_type() == Some(energy_type)
-        })
+        .filter(|(_, pokemon)| pokemon.card.is_basic() && pokemon.is_type(energy_type))
         .map(|(in_play_idx, _)| in_play_idx)
         .collect()
 }
@@ -4978,7 +4974,7 @@ fn extra_damage_if_defender_type(
 ) -> AttackOutcomes {
     let opponent = (state.current_player + 1) % 2;
     let opponent_active = state.get_active(opponent);
-    let damage = if opponent_active.card.get_type() == Some(energy_type) {
+    let damage = if opponent_active.is_type(energy_type) {
         base_damage + extra_damage
     } else {
         base_damage
@@ -5385,7 +5381,7 @@ fn coin_flip_charge_bench(
     let choices = state
         .enumerate_bench_pokemon(state.current_player)
         .filter(|(_, played_card)| {
-            target_benched_type.is_none() || played_card.get_energy_type() == target_benched_type
+            target_benched_type.is_none_or(|energy| played_card.is_type(energy))
         })
         .map(|(in_play_idx, _)| SimpleAction::Attach {
             attachments: energies
@@ -5588,10 +5584,12 @@ fn extra_damage_if_defender_type_in(
     extra_damage: u32,
 ) -> AttackOutcomes {
     let opponent = (state.current_player + 1) % 2;
-    let defender_type = state.get_active(opponent).card.get_type();
-    let damage = match defender_type {
-        Some(t) if energy_types.contains(&t) => base_damage + extra_damage,
-        _ => base_damage,
+    let defender = state.get_active(opponent);
+    // A dual-type defender that matches more than one of `energy_types` still adds the bonus once.
+    let damage = if energy_types.iter().any(|t| defender.is_type(*t)) {
+        base_damage + extra_damage
+    } else {
+        base_damage
     };
     active_damage_doutcome(damage)
 }

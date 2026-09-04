@@ -281,9 +281,21 @@ impl PyPlayedCard {
         self.played_card.get_name()
     }
 
+    /// The Pokémon's *printed* type, as on the card.
     #[getter]
     fn energy_type(&self) -> Option<PyEnergyType> {
-        self.played_card.get_energy_type().map(|t| t.into())
+        self.played_card.card.get_type().map(|t| t.into())
+    }
+
+    /// Every type this Pokémon counts as while in play: its printed type plus any granted by an
+    /// Ability (Urshifu's Double Type). This is what the engine's rules checks use.
+    #[getter]
+    fn energy_types(&self) -> Vec<PyEnergyType> {
+        self.played_card
+            .get_energy_types()
+            .into_iter()
+            .map(|t| t.into())
+            .collect()
     }
 
     #[getter]
