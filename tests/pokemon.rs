@@ -136,6 +136,8 @@ mod honchkrow_evil_admonition_test;
 mod houndstone_last_respects_test;
 #[path = "pokemon/hydrapple_fickle_beam_test.rs"]
 mod hydrapple_fickle_beam_test;
+#[path = "pokemon/illumise_ire_fly_test.rs"]
+mod illumise_ire_fly_test;
 #[path = "pokemon/iron_bundle_ex_test.rs"]
 mod iron_bundle_ex_test;
 #[path = "pokemon/iron_bundle_test.rs"]
@@ -228,6 +230,8 @@ mod morpeko_test;
 mod nidoqueen_test;
 #[path = "pokemon/ninetales_ember_dance_test.rs"]
 mod ninetales_ember_dance_test;
+#[path = "pokemon/octillery_octazooka_test.rs"]
+mod octillery_octazooka_test;
 #[path = "pokemon/oricorio_happiny_damage_boost_test.rs"]
 mod oricorio_happiny_damage_boost_test;
 #[path = "pokemon/oricorio_yveltal_test.rs"]

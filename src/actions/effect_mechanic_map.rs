@@ -1012,7 +1012,19 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
     map.insert("If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 40 more damage.", Mechanic::ExtraDamageIfKnockedOutLastTurn { energy_type: None, extra_damage: 40 });
     map.insert("If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 50 more damage.", Mechanic::ExtraDamageIfKnockedOutLastTurn { energy_type: None, extra_damage: 50 });
     map.insert("If the Defending Pokémon is a Basic Pokémon, it can't attack during your opponent's next turn.", Mechanic::BlockBasicAttack);
-    // map.insert("If the Defending Pokémon tries to use an attack, your opponent flips a coin. If tails, that attack doesn't happen. This effect lasts until the Defending Pokémon leaves the Active Spot, and it doesn't stack.", todo_implementation);
+    // Octillery - Octazooka. The effect lasts until the Defending Pokemon leaves the Active
+    // Spot, which `u8::MAX` models: effects are cleared whenever a Pokemon leaves the Active
+    // Spot, and no game lasts 255 turns. It does not stack, but stacking would be a no-op
+    // anyway since the block check only asks whether the effect is present.
+    map.insert(
+        "If the Defending Pokémon tries to use an attack, your opponent flips a coin. If tails, that attack doesn't happen. This effect lasts until the Defending Pokémon leaves the Active Spot, and it doesn't stack.",
+        Mechanic::DamageAndCardEffect {
+            opponent: true,
+            effect: CardEffect::CoinFlipToBlockAttack,
+            duration: u8::MAX,
+            coin_flip: false,
+        },
+    );
     map.insert(
         "If this Pokémon evolved during this turn, this attack does 20 more damage.",
         Mechanic::ExtraDamageIfEvolvedThisTurn { extra_damage: 20 },
@@ -1048,7 +1060,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "This attack does 40 damage for each Pokémon Tool attached to all of your Pokémon.",
         Mechanic::DamagePerOwnToolAttached { damage_per: 40 },
     );
-    // map.insert("If this Pokémon has any [W] Energy attached, this attack does 40 more damage.", todo_implementation);
+    map.insert(
+        "If this Pokémon has any [W] Energy attached, this attack does 40 more damage.",
+        Mechanic::ExtraDamageIfSelfHasTypeEnergy {
+            energy_type: EnergyType::Water,
+            extra_damage: 40,
+        },
+    );
     map.insert("If this Pokémon has at least 1 extra [W] Energy attached, this attack does 40 more damage.",
         Mechanic::ExtraDamageIfExtraEnergy {
             required_extra_energy: vec![EnergyType::Water],
@@ -1150,7 +1168,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         },
     );
     // map.insert("If this Pokémon was damaged by an attack during your opponent's last turn while it was in the Active Spot, this attack does 50 more damage.", todo_implementation);
-    // map.insert("If this Pokémon's remaining HP is 30 or less, this attack does 60 more damage.", todo_implementation);
+    map.insert(
+        "If this Pokémon's remaining HP is 30 or less, this attack does 60 more damage.",
+        Mechanic::ExtraDamageIfSelfHpAtMost {
+            threshold: 30,
+            extra_damage: 60,
+        },
+    );
     // map.insert("If you have exactly 1, 3, or 5 cards in your hand, this attack does 60 more damage.", todo_implementation);
     // map.insert("If you have exactly 2, 4, or 6 cards in your hand, this attack does 30 more damage.", todo_implementation);
     map.insert(
@@ -2524,7 +2548,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             extra_damage: 50,
         },
     );
-    // map.insert("If this Pokémon has any [F] Energy attached, this attack does 60 more damage.", todo_implementation);
+    map.insert(
+        "If this Pokémon has any [F] Energy attached, this attack does 60 more damage.",
+        Mechanic::ExtraDamageIfSelfHasTypeEnergy {
+            energy_type: EnergyType::Fighting,
+            extra_damage: 60,
+        },
+    );
     map.insert(
         "If this Pokémon has at least 1 extra [F] Energy attached, this attack does 50 more damage.",
         Mechanic::ExtraDamageIfExtraEnergy {
@@ -2645,6 +2675,41 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         Mechanic::ExtraDamagePerSpecificEnergy {
             energy_type: EnergyType::Metal,
             damage_per_energy: 10,
+        },
+    );
+
+    // ---------------------------------------------------------------------------------------
+    // Coverage batch B
+    // ---------------------------------------------------------------------------------------
+    // Furfrou - Continuous Steps
+    map.insert(
+        "Flip a coin until you get tails. This attack does 30 damage for each heads.",
+        Mechanic::FlipUntilTailsDamage {
+            damage_per_heads: 30,
+        },
+    );
+    // Illumise - Ire-Fly
+    map.insert(
+        "If Volbeat is in your discard pile, this attack does 60 more damage.",
+        Mechanic::ExtraDamageIfCardInDiscard {
+            card_name: "Volbeat".to_string(),
+            extra_damage: 60,
+        },
+    );
+    // Weavile - Raid
+    map.insert(
+        "If this Pokémon evolved from Sneasel during this turn, this attack does 20 more damage.",
+        Mechanic::ExtraDamageIfEvolvedFromThisTurn {
+            pokemon_name: "Sneasel".to_string(),
+            extra_damage: 20,
+        },
+    );
+    // Archaludon - Raging Blade
+    map.insert(
+        "If this Pokémon has damage on it, this attack does 80 more damage.",
+        Mechanic::ExtraDamageIfHurt {
+            extra_damage: 80,
+            opponent: false,
         },
     );
     map

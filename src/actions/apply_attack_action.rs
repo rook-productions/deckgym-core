@@ -4573,15 +4573,11 @@ fn extra_damage_if_card_in_discard_attack(
     card_name: String,
     extra_damage: u32,
 ) -> AttackOutcomes {
+    // Matches any card in the discard pile by name, Trainer or Pokémon (e.g. Sunflora's
+    // Quick-Grow Beam names an Item, Illumise's Ire-Fly names Volbeat).
     let has_card_in_discard = state.discard_piles[state.current_player]
         .iter()
-        .any(|card| {
-            if let crate::models::Card::Trainer(trainer) = card {
-                trainer.name == card_name
-            } else {
-                false
-            }
-        });
+        .any(|card| card.get_name() == card_name);
     let total_damage = if has_card_in_discard {
         base_damage + extra_damage
     } else {

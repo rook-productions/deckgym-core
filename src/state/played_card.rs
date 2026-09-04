@@ -307,6 +307,11 @@ impl PlayedCard {
         self.effects.push((effect, duration));
     }
 
+    /// Whether this Pokémon currently carries `effect`, regardless of its remaining duration.
+    pub fn has_effect(&self, effect: &CardEffect) -> bool {
+        self.effects.iter().any(|(stored, _)| stored == effect)
+    }
+
     pub(crate) fn get_active_effects(&self) -> Vec<CardEffect> {
         self.effects
             .iter()
