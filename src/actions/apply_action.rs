@@ -215,7 +215,9 @@ pub fn forecast_action(state: &State, action: &Action) -> Outcomes {
         | SimpleAction::BenchOpponentPokemonFromDiscard { .. }
         | SimpleAction::ShuffleOwnDeck
         | SimpleAction::ShuffleRandomOwnHandCardIntoDeck
-        | SimpleAction::MoveOpponentActiveEnergyToSelf { .. } => forecast_deterministic_action(),
+        | SimpleAction::MoveOpponentActiveEnergyToSelf { .. }
+        | SimpleAction::MoveActiveEnergyToBench { .. }
+        | SimpleAction::SwitchOpponentBenchedThenDamage { .. } => forecast_deterministic_action(),
         // Noop is the "decline" branch of Victini's Victory Star prompt when a coin result is
         // parked; otherwise it is an ordinary no-op ("say no" to an optional effect).
         SimpleAction::Noop => {
@@ -609,6 +611,14 @@ fn apply_deterministic_action(rng: &mut StdRng, state: &mut State, action: &Acti
                 state.decks[action.actor].shuffle(false, rng);
             }
         }
+        SimpleAction::MoveActiveEnergyToBench {
+            to_in_play_idx,
+            amount,
+        } => apply_move_active_energy_to_bench(state, action.actor, *to_in_play_idx, *amount),
+        SimpleAction::SwitchOpponentBenchedThenDamage {
+            in_play_idx,
+            damage,
+        } => apply_switch_opponent_benched_then_damage(action.actor, state, *in_play_idx, *damage),
         SimpleAction::Noop => {}
         _ => panic!("Deterministic Action expected"),
     }
@@ -845,6 +855,56 @@ fn apply_discard_own_benched_group_then_damage(
         }
     }
     let opponent = (acting_player + 1) % 2;
+    state.move_generation_stack.push((
+        acting_player,
+        vec![SimpleAction::ApplyDamage {
+            attacking_ref: (acting_player, 0),
+            targets: vec![(damage, opponent, 0)],
+            is_from_active_attack: true,
+        }],
+    ));
+}
+
+/// Regice's Reflect Energy / Swanna's Feathery Cyclone: move Energy off the actor's Active
+/// Pokémon onto one of their Benched Pokémon. `amount: None` moves every attached Energy.
+///
+/// NOTE: for the "N random Energy" wording we move the last N attached instead of sampling, to
+/// avoid expanding the game tree — mirroring `DiscardRandomOpponentActiveEnergy`.
+fn apply_move_active_energy_to_bench(
+    state: &mut State,
+    actor: usize,
+    to_in_play_idx: usize,
+    amount: Option<u32>,
+) {
+    let Some(active) = state.in_play_pokemon[actor][0].as_mut() else {
+        return;
+    };
+    let attached = &mut active.attached_energy;
+    let moved: Vec<EnergyType> = match amount {
+        None => std::mem::take(attached),
+        Some(n) => {
+            let take = (n as usize).min(attached.len());
+            attached.split_off(attached.len() - take)
+        }
+    };
+    if moved.is_empty() {
+        return;
+    }
+    if let Some(target) = state.in_play_pokemon[actor][to_in_play_idx].as_mut() {
+        target.attached_energy.extend(moved);
+    }
+}
+
+/// Sandy Shocks's Pull In and Pound / Team Rocket's Hypno's Entrap: drag the opponent's Benched
+/// Pokémon at `in_play_idx` into the Active Spot, then damage whatever is now Active.
+fn apply_switch_opponent_benched_then_damage(
+    acting_player: usize,
+    state: &mut State,
+    in_play_idx: usize,
+    damage: u32,
+) {
+    let opponent = (acting_player + 1) % 2;
+    apply_retreat(opponent, state, in_play_idx, true);
     state.move_generation_stack.push((
         acting_player,
         vec![SimpleAction::ApplyDamage {

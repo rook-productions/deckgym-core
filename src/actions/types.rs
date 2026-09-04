@@ -262,6 +262,21 @@ pub enum SimpleAction {
     /// their deck. Queued as the single option on the move-generation stack (like Bouncy Body) so
     /// that it resolves with the shared RNG available; it is not a real choice.
     ShuffleRandomOwnHandCardIntoDeck,
+    /// Regice's Reflect Energy / Swanna's Feathery Cyclone: move Energy from the actor's Active
+    /// Pokémon to one of their Benched Pokémon. `amount: Some(n)` moves n Energy; `None` moves
+    /// every Energy attached.
+    MoveActiveEnergyToBench {
+        to_in_play_idx: usize,
+        amount: Option<u32>,
+    },
+    /// Sandy Shocks's Pull In and Pound / Team Rocket's Hypno's Entrap: switch the opponent's
+    /// Benched Pokémon at `in_play_idx` into their Active Spot, then deal `damage` to the new
+    /// Active Pokémon. The two halves are one action so the damage always lands on the Pokémon
+    /// that was just dragged up.
+    SwitchOpponentBenchedThenDamage {
+        in_play_idx: usize,
+        damage: u32,
+    },
     Noop, // No operation, used to have the user say "no" to a question
 }
 
@@ -511,6 +526,18 @@ impl fmt::Display for SimpleAction {
             SimpleAction::ShuffleOwnDeck => write!(f, "ShuffleOwnDeck"),
             SimpleAction::ShuffleRandomOwnHandCardIntoDeck => {
                 write!(f, "ShuffleRandomOwnHandCardIntoDeck")
+            }
+            SimpleAction::MoveActiveEnergyToBench {
+                to_in_play_idx,
+                amount,
+            } => {
+                write!(f, "MoveActiveEnergyToBench(to:{to_in_play_idx}, {amount:?})")
+            }
+            SimpleAction::SwitchOpponentBenchedThenDamage {
+                in_play_idx,
+                damage,
+            } => {
+                write!(f, "SwitchOpponentBenchedThenDamage({in_play_idx}, {damage})")
             }
             SimpleAction::Noop => write!(f, "Noop"),
         }

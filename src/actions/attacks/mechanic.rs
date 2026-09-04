@@ -27,6 +27,26 @@ pub enum CopyAttackSource {
     OpponentActive,
     OpponentInPlay,
     OwnBenchNonEx,
+    /// Mew's Miraculous Memory: the attack is picked *at random* from among the attacks of the
+    /// Pokémon in the opponent's hand and deck, rather than chosen by the attacking player.
+    OpponentHandAndDeckRandom,
+}
+
+impl CopyAttackSource {
+    /// Whether the copied attack is chosen at random instead of by the attacking player.
+    pub fn is_random(&self) -> bool {
+        matches!(self, CopyAttackSource::OpponentHandAndDeckRandom)
+    }
+}
+
+/// What counts as a "match" when an attack reveals the top cards of a deck and deals damage per
+/// matching card (e.g. Golurk's Heavy Rocket, Team Rocket's Wobbuffet's Rocket Frenzy).
+#[derive(Debug, Clone, PartialEq)]
+pub enum RevealCriterion {
+    /// A Pokémon whose printed Retreat Cost is at least this many Energy.
+    PokemonWithRetreatCostAtLeast(usize),
+    /// A Pokémon whose name contains this substring (e.g. "Team Rocket").
+    PokemonWithNameContaining(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1053,4 +1073,120 @@ pub enum Mechanic {
     /// (e.g. 70 HP remaining becomes 30). This sets HP directly, so it is not affected by
     /// Weakness or other damage modifiers.
     HalveOpponentActiveHp,
+    /// Heatmor's Roasting Heat: extra damage if the opponent's Active Pokémon is Burned.
+    /// Sibling of `ExtraDamageIfDefenderPoisoned` / `Confused` / `Asleep`.
+    ExtraDamageIfDefenderBurned {
+        extra_damage: u32,
+    },
+    /// Rotom's Assault Laser: extra damage if the OPPONENT's Active Pokémon has a Pokémon Tool
+    /// attached. Mirror of `ExtraDamageIfToolAttached`, which checks the attacker instead.
+    ExtraDamageIfDefenderToolAttached {
+        extra_damage: u32,
+    },
+    /// Swalot's Swallow Up: extra damage if the opponent's Active Pokémon has strictly less
+    /// remaining HP than the attacking Pokémon. Mirror of `ExtraDamageIfOpponentHpMoreThanSelf`.
+    ExtraDamageIfOpponentHpLessThanSelf {
+        extra_damage: u32,
+    },
+    /// Marowak's Punish: extra damage if the opponent's Active Pokémon's name contains
+    /// `substring` (e.g. "Team Rocket").
+    ExtraDamageIfDefenderNameContains {
+        substring: String,
+        extra_damage: u32,
+    },
+    /// Seviper's Fateful Fang: extra damage if the opponent's Active Pokémon is exactly `name`.
+    ExtraDamageIfDefenderNamed {
+        name: String,
+        extra_damage: u32,
+    },
+    /// Stoutland's Dangerous Bite / Araquanid's Dangerous Claws: extra damage if the opponent's
+    /// Active Pokémon is a Basic Pokémon (Fossils count as Basic).
+    ExtraDamageIfDefenderIsBasic {
+        extra_damage: u32,
+    },
+    /// Kangaskhan's Cross-Cut: extra damage if the opponent's Active Pokémon is an Evolution
+    /// Pokémon (Stage 1 or higher).
+    ExtraDamageIfDefenderIsEvolution {
+        extra_damage: u32,
+    },
+    /// Scovillain's Red-Hot Headbutt: extra damage if the opponent's Active Pokémon is any of
+    /// `energy_types`. Multi-type sibling of `ExtraDamageIfDefenderType`.
+    ExtraDamageIfDefenderTypeIn {
+        energy_types: Vec<EnergyType>,
+        extra_damage: u32,
+    },
+    /// Bronzong's Psychic Resonance: extra damage if the opponent has any Pokémon of
+    /// `energy_type` in play (Active or Bench).
+    ExtraDamageIfOpponentHasTypeInPlay {
+        energy_type: EnergyType,
+        extra_damage: u32,
+    },
+    /// Grumpig's Swaying Dance: extra damage if the opponent's hand size is exactly one of
+    /// `sizes` (e.g. 2, 4 or 6).
+    ExtraDamageIfOpponentHandSizeIn {
+        sizes: Vec<usize>,
+        extra_damage: u32,
+    },
+    /// Buzzwole's Ground Beat: extra damage if the opponent has scored exactly `points` points.
+    ExtraDamageIfOpponentPointsEqual {
+        points: u8,
+        extra_damage: u32,
+    },
+    /// Grafaiai's Colorful Attack: extra damage if the attacker's Pokémon in play have at least
+    /// `minimum_types` distinct Energy types attached across the whole board. Board-wide sibling
+    /// of `ExtraDamageIfDifferentEnergyTypesAttached`, which only looks at the attacker.
+    ExtraDamageIfDifferentEnergyTypesInPlay {
+        minimum_types: usize,
+        extra_damage: u32,
+    },
+    /// Team Rocket's Muk's Poison Absorption: heal `amount` from the attacking Pokémon if the
+    /// opponent's Active Pokémon is Poisoned.
+    SelfHealIfDefenderPoisoned {
+        amount: u32,
+    },
+    /// Celebi's Temporal Leaves: if the opponent's Active Pokémon is evolved, devolve it by
+    /// putting the highest Stage Evolution card on it into the opponent's hand.
+    DevolveOpponentActive,
+    /// Regice's Reflect Energy / Swanna's Feathery Cyclone: move Energy from the attacking
+    /// Pokémon to 1 of the attacker's Benched Pokémon. `amount: Some(n)` moves n Energy;
+    /// `None` moves every Energy attached.
+    MoveEnergyToOneBenched {
+        amount: Option<u32>,
+    },
+    /// Alolan Muk ex's Chemical Panic: 1 Special Condition is chosen at random from `conditions`,
+    /// excluding any already affecting the opponent's Active Pokémon, and applied to it.
+    RandomStatusFromAmong {
+        conditions: Vec<StatusCondition>,
+    },
+    /// Quagsire's Amnesia: 1 of the opponent's Active Pokémon's attacks is chosen at random;
+    /// during the opponent's next turn that Pokémon can't use the chosen attack.
+    DisableRandomOpponentActiveAttack,
+    /// Ampharos's Zapping Bullet: `times` of the opponent's Benched Pokémon are chosen at random
+    /// (independently each time), taking `damage_per_hit` each. The opponent's Active still takes
+    /// the attack's `fixed_damage`. Bench-only sibling of `RandomSpreadDamage`.
+    RandomBenchDamage {
+        times: usize,
+        damage_per_hit: u32,
+    },
+    /// Team Rocket's Slowpoke's Scavenge: put a random Item card from your discard pile into
+    /// your hand.
+    RandomItemFromDiscardToHand,
+    /// Golurk's Heavy Rocket / Team Rocket's Wobbuffet's Rocket Frenzy: reveal the top `count`
+    /// cards of your deck, deal `damage_per_match` for each revealed card matching `criterion`,
+    /// then shuffle the revealed cards back in. The attack's `fixed_damage` is the per-match
+    /// amount, so it is not added as a base.
+    RevealTopDamagePerMatch {
+        count: usize,
+        damage_per_match: u32,
+        criterion: RevealCriterion,
+    },
+    /// Chatot's Mimic / Mime Jr.'s Mime-y Shuffle: shuffle your hand into your deck, then draw a
+    /// card for each card in your opponent's hand.
+    ShuffleHandAndDrawPerOpponentHandCard,
+    /// Sandy Shocks's Pull In and Pound / Team Rocket's Hypno's Entrap: switch 1 of the
+    /// opponent's Benched Pokémon into the Active Spot, then deal `damage` to the new Active
+    /// Pokémon.
+    SwitchOpponentBenchInAndDamage {
+        damage: u32,
+    },
 }

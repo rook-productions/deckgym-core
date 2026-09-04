@@ -6,6 +6,8 @@ mod additional_ability_logic_test;
 mod alcremie_test;
 #[path = "pokemon/alolan_marowak_test.rs"]
 mod alolan_marowak_test;
+#[path = "pokemon/alolan_muk_ex_chemical_panic_test.rs"]
+mod alolan_muk_ex_chemical_panic_test;
 #[path = "pokemon/alolan_sandslash_spike_armor_test.rs"]
 mod alolan_sandslash_spike_armor_test;
 #[path = "pokemon/alomomola_hooh_test.rs"]
@@ -16,6 +18,8 @@ mod altaria_dragon_arcana_test;
 mod alternate_attack_cost_test;
 #[path = "pokemon/ambipom_b1_test.rs"]
 mod ambipom_b1_test;
+#[path = "pokemon/ampharos_zapping_bullet_test.rs"]
+mod ampharos_zapping_bullet_test;
 #[path = "pokemon/applin_share_test.rs"]
 mod applin_share_test;
 #[path = "pokemon/arcanine_test.rs"]
@@ -40,6 +44,8 @@ mod bidoof_super_fang_test;
 mod blastoise_double_splash_test;
 #[path = "pokemon/board_state_conditional_attacks_test.rs"]
 mod board_state_conditional_attacks_test;
+#[path = "pokemon/board_state_conditional_damage_test.rs"]
+mod board_state_conditional_damage_test;
 #[path = "pokemon/bombirdier_test.rs"]
 mod bombirdier_test;
 #[path = "pokemon/bonsly_teary_attack_test.rs"]
@@ -62,6 +68,8 @@ mod cascoon_harden_test;
 mod castform_test;
 #[path = "pokemon/caterpie_quick_growth_test.rs"]
 mod caterpie_quick_growth_test;
+#[path = "pokemon/celebi_temporal_leaves_test.rs"]
+mod celebi_temporal_leaves_test;
 #[path = "pokemon/celebi_time_recall_test.rs"]
 mod celebi_time_recall_test;
 #[path = "pokemon/chansey_blissey_test.rs"]
@@ -94,6 +102,8 @@ mod darkrai_ex_test;
 mod dedenne_surskit_test;
 #[path = "pokemon/delcatty_energy_blender_test.rs"]
 mod delcatty_energy_blender_test;
+#[path = "pokemon/defender_condition_damage_test.rs"]
+mod defender_condition_damage_test;
 #[path = "pokemon/delibird_test.rs"]
 mod delibird_test;
 #[path = "pokemon/diancie_diamond_storm_test.rs"]
@@ -258,16 +268,22 @@ mod meganium_bloomshine_test;
 mod meowstic_test;
 #[path = "pokemon/meowth_carefree_steps_test.rs"]
 mod meowth_carefree_steps_test;
+#[path = "pokemon/mew_miraculous_memory_test.rs"]
+mod mew_miraculous_memory_test;
 #[path = "pokemon/milotic_ex_aqua_charge_test.rs"]
 mod milotic_ex_aqua_charge_test;
 #[path = "pokemon/miltank_rolling_frenzy_test.rs"]
 mod miltank_rolling_frenzy_test;
 #[path = "pokemon/mimikyu_try_to_imitate_test.rs"]
 mod mimikyu_try_to_imitate_test;
+#[path = "pokemon/mimic_shuffle_draw_test.rs"]
+mod mimic_shuffle_draw_test;
 #[path = "pokemon/miraidon_ex_test.rs"]
 mod miraidon_ex_test;
 #[path = "pokemon/morpeko_test.rs"]
 mod morpeko_test;
+#[path = "pokemon/move_energy_to_bench_test.rs"]
+mod move_energy_to_bench_test;
 #[path = "pokemon/nidoqueen_test.rs"]
 mod nidoqueen_test;
 #[path = "pokemon/ninetales_ember_dance_test.rs"]
@@ -304,6 +320,8 @@ mod psyduck_b4_test;
 mod psyduck_test;
 #[path = "pokemon/purrloin_test.rs"]
 mod purrloin_test;
+#[path = "pokemon/quagsire_amnesia_test.rs"]
+mod quagsire_amnesia_test;
 #[path = "pokemon/raging_bolt_test.rs"]
 mod raging_bolt_test;
 #[path = "pokemon/raichu_evoshock_test.rs"]
@@ -312,6 +330,8 @@ mod raichu_evoshock_test;
 mod rampardos_head_smash_test;
 #[path = "pokemon/regidrago_draconic_slam_test.rs"]
 mod regidrago_draconic_slam_test;
+#[path = "pokemon/reveal_top_damage_test.rs"]
+mod reveal_top_damage_test;
 #[path = "pokemon/rhyperior_test.rs"]
 mod rhyperior_test;
 #[path = "pokemon/roaring_moon_test.rs"]
@@ -352,6 +372,8 @@ mod sunflora_quick_grow_beam_test;
 mod swift_attacks_d_test;
 #[path = "pokemon/swift_shot_test.rs"]
 mod swift_shot_test;
+#[path = "pokemon/switch_opponent_bench_in_test.rs"]
+mod switch_opponent_bench_in_test;
 #[path = "pokemon/sylveon_soothing_ribbon_test.rs"]
 mod sylveon_soothing_ribbon_test;
 #[path = "pokemon/tandemaus_b2_test.rs"]
@@ -364,6 +386,8 @@ mod team_rockets_moltres_ex_heat_charged_test;
 mod team_rockets_raticate_ex_test;
 #[path = "pokemon/team_rockets_slowking_ex_test.rs"]
 mod team_rockets_slowking_ex_test;
+#[path = "pokemon/team_rockets_slowpoke_scavenge_test.rs"]
+mod team_rockets_slowpoke_scavenge_test;
 #[path = "pokemon/team_rockets_weezing_ex_test.rs"]
 mod team_rockets_weezing_ex_test;
 #[path = "pokemon/team_rockets_zapdos_ex_thunderclaw_test.rs"]
