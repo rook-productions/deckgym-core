@@ -247,6 +247,9 @@ fn forecast_ability_by_mechanic(
         | AbilityMechanic::ImmuneToStatusCondition { .. } => {
             panic!("ImmuneToStatusConditions is a passive ability")
         }
+        AbilityMechanic::PreventOpponentAttackEffectsOnSelf => {
+            panic!("PreventOpponentAttackEffectsOnSelf is a passive ability")
+        }
         AbilityMechanic::ReduceTypedAttackCostIfHasTool { .. }
         | AbilityMechanic::IncreaseHpOfYourTypedPokemon { .. }
         | AbilityMechanic::NoHealingForAnyone

@@ -259,6 +259,12 @@ pub enum AbilityMechanic {
     ImmuneToStatusCondition {
         condition: StatusCondition,
     },
+    /// Regice's Crystal Body: "Prevent all effects of attacks used by your opponent's Pokémon
+    /// done to this Pokémon." Shares its enforcement with the Clear Veil Tool — see
+    /// `State::is_shielded_from_opponent_attack_effects`, which is consulted by
+    /// `State::add_effect_to_in_play` and `State::apply_status_condition`. Damage (and any Knock
+    /// Out that follows) is not an "effect", so it is unaffected.
+    PreventOpponentAttackEffectsOnSelf,
     /// Cherubi's En-fruits-iastic: "If this Pokémon has a Pokémon Tool attached, attacks used by
     /// this Pokémon cost `amount` less [`energy_type`] Energy." Resolved in
     /// `hooks::get_attack_cost`.

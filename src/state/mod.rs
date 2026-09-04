@@ -229,9 +229,8 @@ impl State {
     /// Block (no Pokémon on either side can be healed).
     pub(crate) fn refresh_ability_board_bonuses(&mut self) {
         let heal_blocked = (0..2).any(|player| {
-            self.enumerate_in_play_pokemon(player).any(|(_, pokemon)| {
-                pokemon.has_ability(&AbilityMechanic::NoHealingForAnyone)
-            })
+            self.enumerate_in_play_pokemon(player)
+                .any(|(_, pokemon)| pokemon.has_ability(&AbilityMechanic::NoHealingForAnyone))
         });
         let typed_hp_bonuses: [Vec<(EnergyType, u32)>; 2] = [
             collect_typed_hp_bonuses(self, 0),
@@ -561,13 +560,21 @@ impl State {
             .expect("Active Pokemon should be there")
     }
 
-    /// Clear Veil: "Prevent all effects of attacks used by your opponent's Pokémon done to the
-    /// Pokémon this card is attached to."
+    /// "Prevent all effects of attacks used by your opponent's Pokémon done to this Pokémon."
+    /// Two cards share this wording and therefore this one predicate:
+    ///   - the Clear Veil Tool (B4 149), for the Pokémon it is attached to;
+    ///   - Regice's Crystal Body Ability (A2 034), for Regice itself.
+    ///
+    /// What counts as an "effect": the Special Conditions and the `CardEffect`s an attack imposes
+    /// on the targeted Pokémon — the two channels every attack uses to place something *on* a
+    /// Pokémon, i.e. `apply_status_condition` and `add_effect_to_in_play`. Damage, and the Knock
+    /// Out that may follow from it, are explicitly *not* effects, so a shielded Pokémon still
+    /// takes full damage and can still be Knocked Out.
     ///
     /// An attack's effects are applied while its user is `current_player`, so a target belonging
     /// to the *other* player is exactly "done to it by the opponent's attack". Effects a player
-    /// applies to their own Pokémon (their own attack's self-buffs, their own Trainer cards) are
-    /// untouched, matching the card text.
+    /// applies to their own Pokémon (their own attack's self-buffs, their own Trainer cards, a
+    /// Tool like Poison Barb punishing them for attacking) are untouched, matching the card text.
     pub(crate) fn is_shielded_from_opponent_attack_effects(
         &self,
         player: usize,
@@ -578,12 +585,16 @@ impl State {
         }
         self.in_play_pokemon[player][in_play_idx]
             .as_ref()
-            .is_some_and(|pokemon| has_tool(pokemon, crate::card_ids::CardId::B4149ClearVeil))
+            .is_some_and(|pokemon| {
+                has_tool(pokemon, crate::card_ids::CardId::B4149ClearVeil)
+                    || pokemon.has_ability(&AbilityMechanic::PreventOpponentAttackEffectsOnSelf)
+            })
     }
 
     /// Adds a `CardEffect` to a Pokémon in play, honouring shields that block effects coming from
-    /// the opponent's attacks (Clear Veil). Prefer this over calling `PlayedCard::add_effect`
-    /// directly whenever the effect is being imposed on a target rather than chosen by its owner.
+    /// the opponent's attacks (Clear Veil / Crystal Body). Prefer this over calling
+    /// `PlayedCard::add_effect` directly whenever the effect is being imposed on a target rather
+    /// than chosen by its owner.
     pub(crate) fn add_effect_to_in_play(
         &mut self,
         player: usize,
@@ -592,7 +603,7 @@ impl State {
         duration: u8,
     ) {
         if self.is_shielded_from_opponent_attack_effects(player, in_play_idx) {
-            debug!("Clear Veil: Preventing {effect:?} from the opponent's attack");
+            debug!("Clear Veil / Crystal Body: Preventing {effect:?} from the opponent's attack");
             return;
         }
         if let Some(pokemon) = self.in_play_pokemon[player][in_play_idx].as_mut() {
@@ -633,7 +644,7 @@ impl State {
         }
 
         if self.is_shielded_from_opponent_attack_effects(player, in_play_idx) {
-            debug!("Clear Veil: Preventing a Special Condition from the opponent's attack");
+            debug!("Clear Veil / Crystal Body: Preventing a Special Condition from the opponent's attack");
             return;
         }
 
@@ -938,15 +949,13 @@ impl State {
 fn collect_typed_hp_bonuses(state: &State, player: usize) -> Vec<(EnergyType, u32)> {
     state
         .enumerate_in_play_pokemon(player)
-        .filter_map(
-            |(_, pokemon)| match pokemon.ability_mechanic() {
-                Some(AbilityMechanic::IncreaseHpOfYourTypedPokemon {
-                    energy_type,
-                    amount,
-                }) => Some((*energy_type, *amount)),
-                _ => None,
-            },
-        )
+        .filter_map(|(_, pokemon)| match pokemon.ability_mechanic() {
+            Some(AbilityMechanic::IncreaseHpOfYourTypedPokemon {
+                energy_type,
+                amount,
+            }) => Some((*energy_type, *amount)),
+            _ => None,
+        })
         .collect()
 }
 

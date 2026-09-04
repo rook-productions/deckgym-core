@@ -100,10 +100,10 @@ mod croagunk_toxicroak_test;
 mod darkrai_ex_test;
 #[path = "pokemon/dedenne_surskit_test.rs"]
 mod dedenne_surskit_test;
-#[path = "pokemon/delcatty_energy_blender_test.rs"]
-mod delcatty_energy_blender_test;
 #[path = "pokemon/defender_condition_damage_test.rs"]
 mod defender_condition_damage_test;
+#[path = "pokemon/delcatty_energy_blender_test.rs"]
+mod delcatty_energy_blender_test;
 #[path = "pokemon/delibird_test.rs"]
 mod delibird_test;
 #[path = "pokemon/diancie_diamond_storm_test.rs"]
@@ -274,10 +274,10 @@ mod mew_miraculous_memory_test;
 mod milotic_ex_aqua_charge_test;
 #[path = "pokemon/miltank_rolling_frenzy_test.rs"]
 mod miltank_rolling_frenzy_test;
-#[path = "pokemon/mimikyu_try_to_imitate_test.rs"]
-mod mimikyu_try_to_imitate_test;
 #[path = "pokemon/mimic_shuffle_draw_test.rs"]
 mod mimic_shuffle_draw_test;
+#[path = "pokemon/mimikyu_try_to_imitate_test.rs"]
+mod mimikyu_try_to_imitate_test;
 #[path = "pokemon/miraidon_ex_test.rs"]
 mod miraidon_ex_test;
 #[path = "pokemon/morpeko_test.rs"]
@@ -328,6 +328,8 @@ mod raging_bolt_test;
 mod raichu_evoshock_test;
 #[path = "pokemon/rampardos_head_smash_test.rs"]
 mod rampardos_head_smash_test;
+#[path = "pokemon/regice_crystal_body_test.rs"]
+mod regice_crystal_body_test;
 #[path = "pokemon/regidrago_draconic_slam_test.rs"]
 mod regidrago_draconic_slam_test;
 #[path = "pokemon/reveal_top_damage_test.rs"]

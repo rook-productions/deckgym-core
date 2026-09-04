@@ -5,7 +5,9 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use crate::{
-    actions::attacks::{AttackCostCondition, BenchSide, CopyAttackSource, Mechanic, RevealCriterion},
+    actions::attacks::{
+        AttackCostCondition, BenchSide, CopyAttackSource, Mechanic, RevealCriterion,
+    },
     card_ids::CardId,
     effects::{CardEffect, TurnEffect},
     models::{EnergyType, StatusCondition, TrainerType},

@@ -156,14 +156,14 @@ fn has_no_retreat_cost_from_abilities(state: &State, card: &PlayedCard) -> bool 
 
     // Auras only free the *Active* Pokémon, so they never apply to a Benched retreat-cost query.
     let card_name = card.get_name();
-    state.enumerate_in_play_pokemon(player).any(|(_, pokemon)| {
-        match pokemon.ability_mechanic() {
+    state
+        .enumerate_in_play_pokemon(player)
+        .any(|(_, pokemon)| match pokemon.ability_mechanic() {
             Some(AbilityMechanic::NoRetreatCostForYourActive { pokemon_name }) => {
                 pokemon_name.as_ref().is_none_or(|name| *name == card_name)
             }
             _ => false,
-        }
-    })
+        })
 }
 
 /// Whether `player` has any in-play Pokémon whose name is in `names`.
