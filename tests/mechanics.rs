@@ -10,5 +10,7 @@ mod confusion_test;
 mod end_of_turn_knockout_ordering_test;
 #[path = "mechanics/hoopa_ex_deceptive_needle_quick_growth_test.rs"]
 mod hoopa_ex_deceptive_needle_quick_growth_test;
+#[path = "mechanics/retreat_cost_abilities_test.rs"]
+mod retreat_cost_abilities_test;
 #[path = "mechanics/retreat_test.rs"]
 mod retreat_test;

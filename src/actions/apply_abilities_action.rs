@@ -242,6 +242,13 @@ fn forecast_ability_by_mechanic(
         AbilityMechanic::NoRetreatIfHasEnergy => {
             panic!("NoRetreatIfHasEnergy is a passive ability")
         }
+        AbilityMechanic::NoRetreatCostIfNamedPokemonInPlay { .. }
+        | AbilityMechanic::NoRetreatCostForYourActive { .. }
+        | AbilityMechanic::NoRetreatCostDuringFirstTurn
+        | AbilityMechanic::NoRetreatCostIfStadiumInPlay
+        | AbilityMechanic::ReduceRetreatCostIfAnotherSameNameInPlay { .. } => {
+            panic!("Retreat-cost mechanics are passive abilities")
+        }
         AbilityMechanic::PreventAllDamageFromEx => {
             panic!("PreventAllDamageFromEx is a passive ability")
         }

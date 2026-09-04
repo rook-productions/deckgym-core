@@ -219,6 +219,29 @@ pub enum AbilityMechanic {
         amount: u32,
     },
     NoRetreatIfHasEnergy,
+    /// "If you have <names> in play, this Pokémon has no Retreat Cost." (Heatran/Rotom's Speed
+    /// Link with Arceus, Latios's Fantastical Floating with Latias.) Passive; resolved in
+    /// `hooks::get_retreat_cost`.
+    NoRetreatCostIfNamedPokemonInPlay {
+        names: Vec<String>,
+    },
+    /// "Your Active Pokémon has no Retreat Cost." (Jumpluff's Fluffy Flight; Tatsugiri's Retreat
+    /// Directive restricts it to an Active Dondozo via `pokemon_name`.) An aura: the holder can be
+    /// Active or Benched. Passive; resolved in `hooks::get_retreat_cost`.
+    NoRetreatCostForYourActive {
+        pokemon_name: Option<String>,
+    },
+    /// Wimpod's Wimp Out: "During your first turn, this Pokémon has no Retreat Cost."
+    /// Passive; resolved in `hooks::get_retreat_cost`.
+    NoRetreatCostDuringFirstTurn,
+    /// Alolan Raichu's Surge Surfer: "If a Stadium is in play, this Pokémon has no Retreat Cost."
+    /// Passive; resolved in `hooks::get_retreat_cost`.
+    NoRetreatCostIfStadiumInPlay,
+    /// Beldum's Conductive Body: "If you have another <same name> in play, this Pokémon's Retreat
+    /// Cost is `amount` less." Passive; resolved in `hooks::get_retreat_cost`.
+    ReduceRetreatCostIfAnotherSameNameInPlay {
+        amount: u8,
+    },
     PreventAllDamageFromEx,
     SleepOnZoneAttachToSelfWhileActive,
     IncreasePoisonDamage {

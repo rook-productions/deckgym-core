@@ -103,7 +103,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "During Pokémon Checkup, if this Pokémon is in the Active Spot, do 10 damage to your opponent's Active Pokémon.",
             AbilityMechanic::CheckupDamageToOpponentActive { amount: 10 },
         );
-        // map.insert("During your first turn, this Pokémon has no Retreat Cost.", todo_implementation);
+        map.insert(
+            "During your first turn, this Pokémon has no Retreat Cost.",
+            AbilityMechanic::NoRetreatCostDuringFirstTurn,
+        );
         map.insert(
             "Each [G] Energy attached to your [G] Pokémon provides 2 [G] Energy. This effect doesn't stack.",
             AbilityMechanic::DoubleGrassEnergy,
@@ -119,7 +122,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             },
         );
         // map.insert("Each of your [G] Pokémon gets +20 HP.", todo_implementation);
-        // map.insert("If a Stadium is in play, this Pokémon has no Retreat Cost.", todo_implementation);
+        map.insert(
+            "If a Stadium is in play, this Pokémon has no Retreat Cost.",
+            AbilityMechanic::NoRetreatCostIfStadiumInPlay,
+        );
         map.insert(
             "If any damage is done to this Pokémon by attacks, flip a coin. If heads, prevent that damage.",
             AbilityMechanic::CoinFlipToPreventDamage,
@@ -177,12 +183,22 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "If you have Arceus or Arceus ex in play, attacks used by this Pokémon do +30 damage to your opponent's Active Pokémon.",
             AbilityMechanic::IncreaseDamageIfArceusInPlay { amount: 30 },
         );
-        // map.insert("If you have Arceus or Arceus ex in play, this Pokémon has no Retreat Cost.", todo_implementation);
+        map.insert(
+            "If you have Arceus or Arceus ex in play, this Pokémon has no Retreat Cost.",
+            AbilityMechanic::NoRetreatCostIfNamedPokemonInPlay {
+                names: vec!["Arceus".to_string(), "Arceus ex".to_string()],
+            },
+        );
         map.insert(
             "If you have Arceus or Arceus ex in play, this Pokémon takes -30 damage from attacks.",
             AbilityMechanic::ReduceDamageFromAttacksIfArceusInPlay { amount: 30 },
         );
-        // map.insert("If you have Latias in play, this Pokémon has no Retreat Cost.", todo_implementation);
+        map.insert(
+            "If you have Latias in play, this Pokémon has no Retreat Cost.",
+            AbilityMechanic::NoRetreatCostIfNamedPokemonInPlay {
+                names: vec!["Latias".to_string()],
+            },
+        );
         // map.insert("If you have another Falinks in play, this Pokémon's attacks do +20 damage to your opponent's Active Pokémon, and this Pokémon takes -20 damage from attacks from your opponent's Pokémon.", todo_implementation);
         map.insert(
             "If your opponent's Pokémon is Knocked Out by damage from this Pokémon's attacks, during your opponent's next turn, prevent all damage from—and effects of—attacks done to this Pokémon.",
@@ -467,8 +483,16 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
             "You must discard a card from your hand in order to use this Ability. Once during your turn, you may draw a card.",
             AbilityMechanic::DiscardFromHandToDrawCard,
         );
-        // map.insert("Your Active Dondozo has no Retreat Cost.", todo_implementation);
-        // map.insert("Your Active Pokémon has no Retreat Cost.", todo_implementation);
+        map.insert(
+            "Your Active Dondozo has no Retreat Cost.",
+            AbilityMechanic::NoRetreatCostForYourActive {
+                pokemon_name: Some("Dondozo".to_string()),
+            },
+        );
+        map.insert(
+            "Your Active Pokémon has no Retreat Cost.",
+            AbilityMechanic::NoRetreatCostForYourActive { pokemon_name: None },
+        );
         map.insert(
             "Your opponent can't play any Pokémon from their hand to evolve their Active Pokémon.",
             AbilityMechanic::PreventOpponentActiveEvolution,
@@ -588,6 +612,12 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
         map.insert(
             "During Pokémon Checkup, heal 10 damage from each of your Pokémon.",
             AbilityMechanic::HealAllYourPokemonDuringCheckup { amount: 10 },
+        );
+
+        // b4 / b4a mechanics
+        map.insert(
+            "If you have another Beldum in play, this Pokémon's Retreat Cost is 2 less.",
+            AbilityMechanic::ReduceRetreatCostIfAnotherSameNameInPlay { amount: 2 },
         );
         map
     });
