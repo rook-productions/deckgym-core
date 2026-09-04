@@ -244,9 +244,10 @@ fn forecast_effect_attack_by_mechanic(
         Mechanic::HealOneYourBenchedPokemon { amount } => {
             heal_one_your_benched_pokemon_attack(*amount)
         }
-        Mechanic::HealAllYourPokemon { amount } => {
-            heal_all_your_pokemon_attack(attack.fixed_damage, *amount)
-        }
+        Mechanic::HealAllYourPokemon {
+            amount,
+            energy_type,
+        } => heal_all_your_pokemon_attack(attack.fixed_damage, *amount, *energy_type),
         Mechanic::HealAllBenchedPokemon { amount, only_basic } => {
             heal_all_benched_pokemon_attack(attack.fixed_damage, *amount, *only_basic)
         }
@@ -749,11 +750,13 @@ fn forecast_effect_attack_by_mechanic(
         Mechanic::ExtraDamageIfKnockedOutLastTurn {
             energy_type,
             extra_damage,
+            status,
         } => extra_damage_if_knocked_out_last_turn_attack(
             state,
             attack.fixed_damage,
             *energy_type,
             *extra_damage,
+            *status,
         ),
         Mechanic::ExtraDamageIfAttackUsedDuringOwnLastTurn {
             attack_name,
@@ -1076,7 +1079,91 @@ fn forecast_effect_attack_by_mechanic(
         Mechanic::CoinFlipTailsSelfCardEffect { effect, duration } => {
             coin_flip_tails_self_card_effect(attack.fixed_damage, effect.clone(), *duration)
         }
+        Mechanic::AlsoBenchDamageIfPokemonOnBench {
+            pokemon_name,
+            bench_damage,
+        } => also_bench_damage_if_pokemon_on_bench(
+            state,
+            attack.fixed_damage,
+            pokemon_name,
+            *bench_damage,
+        ),
+        Mechanic::DiscardOpponentEnergyIfEvolvedFromThisTurn {
+            pokemon_name,
+            count,
+        } => discard_opponent_energy_if_evolved_from_this_turn(
+            state,
+            attack.fixed_damage,
+            pokemon_name,
+            *count,
+        ),
+        Mechanic::HalveOpponentActiveHp => halve_opponent_active_hp(),
     }
+}
+
+/// Whether the attacking Pokémon evolved from a Pokémon named `pokemon_name` during this turn.
+/// Checks the card directly underneath, so evolving via Rare Candy (which skips the named
+/// Stage 1) does not qualify.
+fn evolved_from_named_this_turn(state: &State, pokemon_name: &str) -> bool {
+    state.in_play_pokemon[state.current_player][0]
+        .as_ref()
+        .is_some_and(|active| {
+            active.played_this_turn
+                && active
+                    .cards_behind
+                    .last()
+                    .is_some_and(|under| under.get_name() == pokemon_name)
+        })
+}
+
+/// Minun - Buddy Spark / Magmortar - Thundering Volcano.
+fn also_bench_damage_if_pokemon_on_bench(
+    state: &State,
+    active_damage: u32,
+    pokemon_name: &str,
+    bench_damage: u32,
+) -> AttackOutcomes {
+    let has_partner = state
+        .enumerate_bench_pokemon(state.current_player)
+        .any(|(_, pokemon)| pokemon.get_name() == pokemon_name);
+    if !has_partner {
+        return active_damage_doutcome(active_damage);
+    }
+    let opponent = (state.current_player + 1) % 2;
+    let mut targets: Vec<DamageTarget> = state
+        .enumerate_bench_pokemon(opponent)
+        .map(|(idx, _)| (bench_damage, true, idx))
+        .collect();
+    targets.push((active_damage, true, 0));
+    damage_effect_doutcome(targets, |_, _, _| {})
+}
+
+/// Dudunsparce - Sudden Drilling.
+fn discard_opponent_energy_if_evolved_from_this_turn(
+    state: &State,
+    damage: u32,
+    pokemon_name: &str,
+    count: usize,
+) -> AttackOutcomes {
+    if !evolved_from_named_this_turn(state, pokemon_name) {
+        return active_damage_doutcome(damage);
+    }
+    active_damage_effect_doutcome(damage, move |rng, state, action| {
+        discard_random_energy_from_opponent_active(rng, state, action.actor, count);
+    })
+}
+
+/// Bidoof - Super Fang. Pocket keeps HP in multiples of 10, so "rounded down" rounds the halved
+/// HP down to the nearest 10 (70 remaining becomes 30, i.e. 40 damage). The HP is set directly
+/// rather than dealt as damage, so Weakness and other damage modifiers do not apply.
+fn halve_opponent_active_hp() -> AttackOutcomes {
+    active_damage_effect_doutcome(0, move |_, state, action| {
+        let opponent = (action.actor + 1) % 2;
+        let active = state.get_active_mut(opponent);
+        let remaining = active.get_remaining_hp();
+        let halved = (remaining / 20) * 10;
+        active.apply_damage(remaining - halved);
+    })
 }
 
 /// Maushold - Family Beatdown.
@@ -2722,15 +2809,27 @@ fn heal_one_your_benched_pokemon_attack(amount: u32) -> AttackOutcomes {
     })
 }
 
-fn heal_all_your_pokemon_attack(damage: u32, heal: u32) -> AttackOutcomes {
+fn heal_all_your_pokemon_attack(
+    damage: u32,
+    heal: u32,
+    energy_type: Option<EnergyType>,
+) -> AttackOutcomes {
     active_damage_effect_doutcome(damage, move |_, state, action| {
-        heal_all_pokemon(state, action.actor, heal);
+        heal_all_pokemon(state, action.actor, heal, energy_type);
     })
 }
 
-fn heal_all_pokemon(state: &mut State, player: usize, amount: u32) {
+/// Heal every in-play Pokémon of `player`, or only those of `energy_type` when it is given.
+fn heal_all_pokemon(
+    state: &mut State,
+    player: usize,
+    amount: u32,
+    energy_type: Option<EnergyType>,
+) {
     for pokemon in state.in_play_pokemon[player].iter_mut().flatten() {
-        pokemon.heal(amount);
+        if energy_type.is_none() || pokemon.get_energy_type() == energy_type {
+            pokemon.heal(amount);
+        }
     }
 }
 
@@ -3744,13 +3843,20 @@ fn extra_damage_if_knocked_out_last_turn_attack(
     base_damage: u32,
     energy_type: Option<EnergyType>,
     extra_damage: u32,
+    status: Option<StatusCondition>,
 ) -> AttackOutcomes {
-    let damage = if state.was_knocked_out_by_opponent_attack_last_turn(energy_type) {
-        base_damage + extra_damage
-    } else {
-        base_damage
-    };
-    active_damage_doutcome(damage)
+    if !state.was_knocked_out_by_opponent_attack_last_turn(energy_type) {
+        return active_damage_doutcome(base_damage);
+    }
+    let damage = base_damage + extra_damage;
+    match status {
+        // Lapras' Raging Freeze / Toxtricity's Vengeful Shock also inflict a Special Condition.
+        Some(status) => active_damage_effect_doutcome(damage, move |_, state, action| {
+            let opponent = (action.actor + 1) % 2;
+            state.apply_status_condition(opponent, 0, status);
+        }),
+        None => active_damage_doutcome(damage),
+    }
 }
 
 fn extra_damage_if_attack_used_during_own_last_turn(
@@ -3825,16 +3931,7 @@ fn extra_damage_if_evolved_from_this_turn_attack(
     pokemon_name: &str,
     extra_damage: u32,
 ) -> AttackOutcomes {
-    let evolved_from_named = state.in_play_pokemon[state.current_player][0]
-        .as_ref()
-        .is_some_and(|active| {
-            active.played_this_turn
-                && active
-                    .cards_behind
-                    .last()
-                    .is_some_and(|under| under.get_name() == pokemon_name)
-        });
-    let damage = if evolved_from_named {
+    let damage = if evolved_from_named_this_turn(state, pokemon_name) {
         base_damage + extra_damage
     } else {
         base_damage

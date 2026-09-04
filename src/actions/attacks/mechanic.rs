@@ -30,8 +30,11 @@ pub enum Mechanic {
     HealOneYourBenchedPokemon {
         amount: u32,
     },
+    /// Heal `amount` from each of your in-play Pokémon. `energy_type` narrows it to Pokémon of
+    /// that type (e.g. Diancie's Diamond Storm heals only your [P] Pokémon); `None` heals all.
     HealAllYourPokemon {
         amount: u32,
+        energy_type: Option<EnergyType>,
     },
     /// Heal `amount` from each Benched Pokémon; if `only_basic` is true, only Basic Pokémon
     /// (Alomomola heals all, Ho-Oh heals only Basic).
@@ -502,9 +505,13 @@ pub enum Mechanic {
     /// Marshadow's Revenge and friends: extra damage if any of your Pokemon were Knocked Out by
     /// an attack during the opponent's last turn. `energy_type` restricts which of your Pokemon
     /// count (e.g. Zarude's Dark Vengeance only counts `[D]` Pokemon); `None` counts any.
+    /// `status` additionally inflicts a Special Condition on the opponent's Active Pokémon when
+    /// the condition holds (e.g. Lapras' Raging Freeze paralyzes with no damage bonus, while
+    /// Toxtricity's Vengeful Shock adds both).
     ExtraDamageIfKnockedOutLastTurn {
         energy_type: Option<EnergyType>,
         extra_damage: u32,
+        status: Option<StatusCondition>,
     },
     ExtraDamageIfAttackUsedDuringOwnLastTurn {
         attack_name: String,
@@ -798,4 +805,22 @@ pub enum Mechanic {
         effect: CardEffect,
         duration: u8,
     },
+    /// Minun - Buddy Spark / Magmortar - Thundering Volcano: deal the attack's fixed damage and,
+    /// when a Pokémon named `pokemon_name` is on your Bench, also deal `bench_damage` to each of
+    /// your opponent's Benched Pokémon.
+    AlsoBenchDamageIfPokemonOnBench {
+        pokemon_name: String,
+        bench_damage: u32,
+    },
+    /// Dudunsparce - Sudden Drilling: when this Pokémon evolved from `pokemon_name` during this
+    /// turn, also discard `count` random Energy from the opponent's Active Pokémon.
+    DiscardOpponentEnergyIfEvolvedFromThisTurn {
+        pokemon_name: String,
+        count: usize,
+    },
+    /// Bidoof - Super Fang: halve the opponent's Active Pokémon's remaining HP, rounded down.
+    /// Pocket tracks HP in multiples of 10, so the result is rounded down to the nearest 10
+    /// (e.g. 70 HP remaining becomes 30). This sets HP directly, so it is not affected by
+    /// Weakness or other damage modifiers.
+    HalveOpponentActiveHp,
 }

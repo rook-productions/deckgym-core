@@ -26,6 +26,8 @@ mod audino_test;
 mod azurill_spritzee_test;
 #[path = "pokemon/bellossom_a4_test.rs"]
 mod bellossom_a4_test;
+#[path = "pokemon/bidoof_super_fang_test.rs"]
+mod bidoof_super_fang_test;
 #[path = "pokemon/blastoise_double_splash_test.rs"]
 mod blastoise_double_splash_test;
 #[path = "pokemon/board_state_conditional_attacks_test.rs"]
@@ -80,12 +82,16 @@ mod darkrai_ex_test;
 mod dedenne_surskit_test;
 #[path = "pokemon/delibird_test.rs"]
 mod delibird_test;
+#[path = "pokemon/diancie_diamond_storm_test.rs"]
+mod diancie_diamond_storm_test;
 #[path = "pokemon/dragonair_dragons_blessing_test.rs"]
 mod dragonair_dragons_blessing_test;
 #[path = "pokemon/drampa_test.rs"]
 mod drampa_test;
 #[path = "pokemon/drapion_a2_test.rs"]
 mod drapion_a2_test;
+#[path = "pokemon/dudunsparce_sudden_drilling_test.rs"]
+mod dudunsparce_sudden_drilling_test;
 #[path = "pokemon/durant_test.rs"]
 mod durant_test;
 #[path = "pokemon/dusknoir_shadow_void_test.rs"]
@@ -168,6 +174,8 @@ mod jolteon_ex_test;
 mod kabutops_test;
 #[path = "pokemon/klefki_dismantling_keys_test.rs"]
 mod klefki_dismantling_keys_test;
+#[path = "pokemon/knocked_out_last_turn_status_attacks_test.rs"]
+mod knocked_out_last_turn_status_attacks_test;
 #[path = "pokemon/kommo_o_clanging_scales_test.rs"]
 mod kommo_o_clanging_scales_test;
 #[path = "pokemon/koraidon_urshifu_test.rs"]
@@ -248,6 +256,8 @@ mod octillery_octazooka_test;
 mod oricorio_happiny_damage_boost_test;
 #[path = "pokemon/oricorio_yveltal_test.rs"]
 mod oricorio_yveltal_test;
+#[path = "pokemon/partner_bench_damage_attacks_test.rs"]
+mod partner_bench_damage_attacks_test;
 #[path = "pokemon/passimian_ex_offload_pass_test.rs"]
 mod passimian_ex_offload_pass_test;
 #[path = "pokemon/persian_test.rs"]

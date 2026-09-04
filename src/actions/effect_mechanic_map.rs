@@ -941,14 +941,20 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             status: StatusCondition::Paralyzed,
         },
     );
-    // map.insert("Halve your opponent's Active Pokémon's remaining HP, rounded down.", todo_implementation);
+    map.insert(
+        "Halve your opponent's Active Pokémon's remaining HP, rounded down.",
+        Mechanic::HalveOpponentActiveHp,
+    );
     map.insert(
         "Heal 10 damage from this Pokémon.",
         Mechanic::SelfHeal { amount: 10 },
     );
     map.insert(
         "Heal 20 damage from each of your Pokémon.",
-        Mechanic::HealAllYourPokemon { amount: 20 },
+        Mechanic::HealAllYourPokemon {
+            amount: 20,
+            energy_type: None,
+        },
     );
     map.insert(
         "Heal 20 damage from this Pokémon.",
@@ -1029,9 +1035,9 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "If any of your Benched Pokémon have damage on them, this attack does 50 more damage.",
         Mechanic::ExtraDamageIfAnyBenchedDamaged { extra_damage: 50 },
     );
-    map.insert("If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 60 more damage.", Mechanic::ExtraDamageIfKnockedOutLastTurn { energy_type: None, extra_damage: 60 });
-    map.insert("If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 40 more damage.", Mechanic::ExtraDamageIfKnockedOutLastTurn { energy_type: None, extra_damage: 40 });
-    map.insert("If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 50 more damage.", Mechanic::ExtraDamageIfKnockedOutLastTurn { energy_type: None, extra_damage: 50 });
+    map.insert("If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 60 more damage.", Mechanic::ExtraDamageIfKnockedOutLastTurn { energy_type: None, extra_damage: 60, status: None });
+    map.insert("If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 40 more damage.", Mechanic::ExtraDamageIfKnockedOutLastTurn { energy_type: None, extra_damage: 40, status: None });
+    map.insert("If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 50 more damage.", Mechanic::ExtraDamageIfKnockedOutLastTurn { energy_type: None, extra_damage: 50, status: None });
     map.insert("If the Defending Pokémon is a Basic Pokémon, it can't attack during your opponent's next turn.", Mechanic::BlockBasicAttack);
     // Octillery - Octazooka. The effect lasts until the Defending Pokemon leaves the Active
     // Spot, which `u8::MAX` models: effects are cleared whenever a Pokemon leaves the Active
@@ -2169,7 +2175,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Heal 20 damage from 1 of your Pokémon.",
         Mechanic::HealOneYourPokemon { amount: 20 },
     );
-    // map.insert("If Plusle is on your Bench, this attack also does 10 damage to each of your opponent's Benched Pokémon.", todo_implementation);
+    map.insert(
+        "If Plusle is on your Bench, this attack also does 10 damage to each of your opponent's Benched Pokémon.",
+        Mechanic::AlsoBenchDamageIfPokemonOnBench {
+            pokemon_name: "Plusle".to_string(),
+            bench_damage: 10,
+        },
+    );
     // map.insert("If a Stadium is in play, this attack does 40 more damage.", todo_implementation);
     map.insert(
         "If the amount of Energy attached to both Active Pokémon is 5 or more, this attack does 60 more damage.",
@@ -2386,7 +2398,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "Flip 3 coins. This attack also does 20 damage for each heads to each of your opponent's Benched Pokémon.",
         Mechanic::FlipCoinsBenchDamagePerHead { num_coins: 3, bench_damage_per_head: 20 },
     );
-    // map.insert("If Electivire is on your Bench, this attack also does 20 damage to each of your opponent's Benched Pokémon.", todo_implementation);
+    map.insert(
+        "If Electivire is on your Bench, this attack also does 20 damage to each of your opponent's Benched Pokémon.",
+        Mechanic::AlsoBenchDamageIfPokemonOnBench {
+            pokemon_name: "Electivire".to_string(),
+            bench_damage: 20,
+        },
+    );
     map.insert(
         "If Magmortar is on your Bench, this attack does 70 more damage.",
         Mechanic::ExtraDamageIfPokemonOnBench {
@@ -2394,7 +2412,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             extra_damage: 70,
         },
     );
-    // map.insert("If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, your opponent's Active Pokémon is now Paralyzed.", todo_implementation);
+    map.insert(
+        "If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, your opponent's Active Pokémon is now Paralyzed.",
+        Mechanic::ExtraDamageIfKnockedOutLastTurn {
+            energy_type: None,
+            extra_damage: 0,
+            status: Some(StatusCondition::Paralyzed),
+        },
+    );
     map.insert(
         "If this Pokémon's remaining HP is 110 or less, this attack does 80 more damage.",
         Mechanic::ExtraDamageIfSelfHpAtMost {
@@ -2530,7 +2555,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
     );
     map.insert(
         "Heal 10 damage from each of your Pokémon.",
-        Mechanic::HealAllYourPokemon { amount: 10 },
+        Mechanic::HealAllYourPokemon {
+            amount: 10,
+            energy_type: None,
+        },
     );
     map.insert(
         "Heal 10 damage from each of your Benched Pokémon.",
@@ -2539,7 +2567,13 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             only_basic: false,
         },
     );
-    // map.insert("Heal 20 damage from each of your [P] Pokémon.", todo_implementation);
+    map.insert(
+        "Heal 20 damage from each of your [P] Pokémon.",
+        Mechanic::HealAllYourPokemon {
+            amount: 20,
+            energy_type: Some(EnergyType::Psychic),
+        },
+    );
     map.insert(
         "Heal 30 damage from 1 of your Benched Pokémon.",
         Mechanic::HealOneYourBenchedPokemon { amount: 30 },
@@ -2554,7 +2588,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
     );
     map.insert(
         "Heal 30 damage from each of your Pokémon.",
-        Mechanic::HealAllYourPokemon { amount: 30 },
+        Mechanic::HealAllYourPokemon {
+            amount: 30,
+            energy_type: None,
+        },
     );
     map.insert(
         "If Durant is on your Bench, this attack does 30 more damage.",
@@ -2591,8 +2628,15 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
             status: StatusCondition::Burned,
         },
     );
-    // map.insert("If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 60 more damage, and your opponent's Active Pokémon is now Paralyzed.", todo_implementation);
-    map.insert("If any of your [D] Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 80 more damage.", Mechanic::ExtraDamageIfKnockedOutLastTurn { energy_type: Some(EnergyType::Darkness), extra_damage: 80 });
+    map.insert(
+        "If any of your Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 60 more damage, and your opponent's Active Pokémon is now Paralyzed.",
+        Mechanic::ExtraDamageIfKnockedOutLastTurn {
+            energy_type: None,
+            extra_damage: 60,
+            status: Some(StatusCondition::Paralyzed),
+        },
+    );
+    map.insert("If any of your [D] Pokémon were Knocked Out by damage from an attack during your opponent's last turn, this attack does 80 more damage.", Mechanic::ExtraDamageIfKnockedOutLastTurn { energy_type: Some(EnergyType::Darkness), extra_damage: 80, status: None });
     map.insert(
         "If this Pokémon evolved from Poliwhirl during this turn, this attack does 50 more damage.",
         Mechanic::ExtraDamageIfEvolvedFromThisTurn {
@@ -2798,6 +2842,14 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
     map.insert(
         "If this Pokémon didn't move from the Bench to the Active Spot this turn, this attack does nothing.",
         Mechanic::DamageOnlyIfMovedFromBench,
+    );
+    // Dudunsparce - Sudden Drilling
+    map.insert(
+        "If this Pokémon evolved from Dunsparce during this turn, discard 2 random Energy from your opponent's Active Pokémon.",
+        Mechanic::DiscardOpponentEnergyIfEvolvedFromThisTurn {
+            pokemon_name: "Dunsparce".to_string(),
+            count: 2,
+        },
     );
     map
 });
