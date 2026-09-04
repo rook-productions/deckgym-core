@@ -827,6 +827,10 @@ pub enum Mechanic {
     InflictPoisonWithDamage {
         poison_damage: u32,
     },
+    /// Delcatty's Energy Blender: after damage, the attacker may freely redistribute the Energy
+    /// attached to their own Pokémon in play. Resolved one Energy at a time through
+    /// `SimpleAction::MoveEnergyAndReoffer`; see that variant for why.
+    MoveOwnEnergyAnyWay,
     /// Mesprit's Supreme Blast: usable only while every Pokémon named in `required_bench_names` is
     /// on the attacker's Bench; on use, all Energy is discarded from the attacking Pokémon. The
     /// usability half is enforced in `move_generation::attacks`, which consults this variant.

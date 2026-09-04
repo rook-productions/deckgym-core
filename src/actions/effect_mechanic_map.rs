@@ -2860,5 +2860,10 @@ pub static EFFECT_MECHANIC_MAP: LazyLock<HashMap<&'static str, Mechanic>> = Lazy
         "This attack does 50 more damage for each point your opponent got during their last turn.",
         Mechanic::ExtraDamagePerOpponentPointLastTurn { damage_per: 50 },
     );
+    // Delcatty - Energy Blender
+    map.insert(
+        "You may move any amount of Energy from your Pokémon in play to your other Pokémon in any way you like.",
+        Mechanic::MoveOwnEnergyAnyWay,
+    );
     map
 });

@@ -12,6 +12,7 @@ use crate::{
             apply_activate, shuffle_in_play_pokemon_and_attachments_into_deck,
             wrap_with_common_logic,
         },
+        attack_helpers::energy_blender_choices,
     },
     effects::TurnEffect,
     hooks::{
@@ -187,6 +188,7 @@ pub fn forecast_action(state: &State, action: &Action) -> Outcomes {
         | SimpleAction::DiscardFossil { .. }
         | SimpleAction::DiscardOwnBenchedThenDamage { .. }
         | SimpleAction::DiscardOwnBenchedGroupThenDamage { .. }
+        | SimpleAction::MoveEnergyAndReoffer { .. }
         | SimpleAction::ReturnPokemonToHand { .. }
         | SimpleAction::ShuffleInPlayPokemonIntoDeck { .. }
         | SimpleAction::DiscardToolFromPokemon { .. }
@@ -485,6 +487,19 @@ fn apply_deterministic_action(state: &mut State, action: &Action) {
         SimpleAction::ShuffleInPlayPokemonIntoDeck { in_play_idx } => {
             apply_shuffle_in_play_pokemon_into_deck(action.actor, state, *in_play_idx)
         }
+        SimpleAction::MoveEnergyAndReoffer {
+            from_in_play_idx,
+            to_in_play_idx,
+            energy_type,
+            remaining_moves,
+        } => apply_move_energy_and_reoffer(
+            state,
+            action.actor,
+            *from_in_play_idx,
+            *to_in_play_idx,
+            *energy_type,
+            *remaining_moves,
+        ),
         SimpleAction::DiscardToolFromPokemon {
             player,
             in_play_idx,
@@ -724,6 +739,31 @@ fn forecast_shuffle_self_and_attachments_into_deck(
     Outcomes::single_fn(move |rng, state, _action| {
         shuffle_in_play_pokemon_and_attachments_into_deck(rng, state, acting_player, in_play_idx);
     })
+}
+
+/// Delcatty's Energy Blender: move a single Energy, then offer the same choice again so the player
+/// can keep going (or stop) until the move budget runs out.
+fn apply_move_energy_and_reoffer(
+    state: &mut State,
+    acting_player: usize,
+    from_in_play_idx: usize,
+    to_in_play_idx: usize,
+    energy_type: EnergyType,
+    remaining_moves: usize,
+) {
+    apply_move_energy(
+        state,
+        acting_player,
+        from_in_play_idx,
+        to_in_play_idx,
+        energy_type,
+        1,
+    );
+
+    let choices = energy_blender_choices(state, acting_player, remaining_moves);
+    if !choices.is_empty() {
+        state.move_generation_stack.push((acting_player, choices));
+    }
 }
 
 fn apply_return_pokemon_to_hand(acting_player: usize, state: &mut State, in_play_idx: usize) {

@@ -73,6 +73,7 @@ fn get_weight(action: &SimpleAction) -> u32 {
         SimpleAction::DiscardOwnBenchedThenDamage { .. } => 5, // Trading a Benched Pokemon for damage
         SimpleAction::DiscardOwnBenchedGroupThenDamage { .. } => 5, // Same trade, several Pokemon at once
         SimpleAction::ShuffleSelfAndAttachmentsIntoDeck { .. } => 5,
+        SimpleAction::MoveEnergyAndReoffer { .. } => 5,
 
         SimpleAction::ReturnPokemonToHand { .. } => 5,
         SimpleAction::ShuffleInPlayPokemonIntoDeck { .. } => 5,

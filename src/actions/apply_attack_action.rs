@@ -11,7 +11,8 @@ use crate::{
         },
         apply_evolve,
         attack_helpers::{
-            collect_in_play_indices_by_type, energy_any_way_choices, generate_distributions,
+            collect_in_play_indices_by_type, energy_any_way_choices, energy_blender_choices,
+            generate_distributions, total_attached_energy,
         },
         attacks::{BenchSide, CopyAttackSource, Mechanic},
         effect_ability_mechanic_map::ability_mechanic_from_effect,
@@ -1123,7 +1124,23 @@ fn forecast_effect_attack_by_mechanic(
         Mechanic::RequireBenchedNamesThenDiscardAllEnergy { .. } => {
             damage_and_discard_all_energy(attack.fixed_damage)
         }
+        Mechanic::MoveOwnEnergyAnyWay => move_own_energy_any_way(attack.fixed_damage),
     }
+}
+
+/// Delcatty - Energy Blender: after damage, let the attacker move any amount of Energy among their
+/// own Pokémon in play, one Energy at a time (see `SimpleAction::MoveEnergyAndReoffer`).
+fn move_own_energy_any_way(damage: u32) -> AttackOutcomes {
+    AttackOutcomes::single(AttackOutcome::damage_then_effect(
+        vec![(damage, true, 0)],
+        move |_, state, action| {
+            let budget = total_attached_energy(state, action.actor);
+            let choices = energy_blender_choices(state, action.actor, budget);
+            if !choices.is_empty() {
+                state.move_generation_stack.push((action.actor, choices));
+            }
+        },
+    ))
 }
 
 /// Kingambit - Overlord's Blade: `damage_per` more damage for each of the attacker's own Pokémon

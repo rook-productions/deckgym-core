@@ -157,6 +157,22 @@ pub enum SimpleAction {
         in_play_indices: Vec<usize>,
         damage: u32,
     },
+    /// Delcatty's Energy Blender: move a single Energy between two of your own Pokémon, then offer
+    /// the same choice again (with `remaining_moves` one lower) plus the option to stop.
+    ///
+    /// "You may move any amount of Energy from your Pokémon in play to your other Pokémon in any
+    /// way you like" is played out one Energy at a time rather than enumerated as whole
+    /// redistributions: the number of redistributions is exponential in the Energy on the board
+    /// (thousands of actions in an ordinary mid-game position), while one-at-a-time keeps the
+    /// branching factor to a few dozen and reaches exactly the same set of final boards.
+    /// `remaining_moves` starts at the player's total attached Energy — enough for any
+    /// redistribution, since no Energy ever needs to move twice — and guarantees termination.
+    MoveEnergyAndReoffer {
+        from_in_play_idx: usize,
+        to_in_play_idx: usize,
+        energy_type: EnergyType,
+        remaining_moves: usize,
+    },
     /// Eldegoss's Float Up / Accelgor's Deck and Cover: shuffle one of your own Pokémon in play,
     /// and everything attached to it (evolution cards, Tool), back into your deck. Attached Energy
     /// goes to the discarded-Energy pile. Distinct from `ShuffleInPlayPokemonIntoDeck`, which
@@ -372,6 +388,17 @@ impl fmt::Display for SimpleAction {
             }
             SimpleAction::ShuffleSelfAndAttachmentsIntoDeck { in_play_idx } => {
                 write!(f, "ShuffleSelfAndAttachmentsIntoDeck({in_play_idx})")
+            }
+            SimpleAction::MoveEnergyAndReoffer {
+                from_in_play_idx,
+                to_in_play_idx,
+                energy_type,
+                remaining_moves,
+            } => {
+                write!(
+                    f,
+                    "MoveEnergyAndReoffer({from_in_play_idx} -> {to_in_play_idx}, {energy_type:?}, {remaining_moves} left)"
+                )
             }
             SimpleAction::ReturnPokemonToHand { in_play_idx } => {
                 write!(f, "ReturnPokemonToHand({in_play_idx})")
