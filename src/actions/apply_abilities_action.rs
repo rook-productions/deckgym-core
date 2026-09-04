@@ -382,13 +382,15 @@ fn forecast_ability_by_mechanic(
         AbilityMechanic::HealAllYourPokemonDuringCheckup { .. } => {
             panic!("HealAllYourPokemonDuringCheckup is a passive ability triggered during Pokemon Checkup")
         }
-        AbilityMechanic::VictoryStarReflip => victory_star_reflip(),
+        AbilityMechanic::VictoryStarReflip | AbilityMechanic::LuxuryCoinReflip => {
+            coin_reflip_ability()
+        }
     }
 }
 
-/// Victini's Victory Star, chosen from the reflip prompt: discard the parked coin result and
-/// resolve the same attack again with fresh, independent coins.
-fn victory_star_reflip() -> Outcomes {
+/// Victini's Victory Star / Gholdengo's Luxury Coin, chosen from the reflip prompt: discard the
+/// parked coin result and resolve the same action again with fresh, independent coins.
+fn coin_reflip_ability() -> Outcomes {
     Outcomes::single_fn(move |rng, state, _action| {
         if let Some(pending) = state.take_pending_coin_reflip() {
             crate::actions::resolve_pending_coin_reflip(rng, state, pending, true);

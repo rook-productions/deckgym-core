@@ -106,6 +106,8 @@ mod flygon_ex_test;
 mod gallade_test;
 #[path = "pokemon/gardevoir_psy_turbo_test.rs"]
 mod gardevoir_psy_turbo_test;
+#[path = "pokemon/gholdengo_luxury_coin_test.rs"]
+mod gholdengo_luxury_coin_test;
 #[path = "pokemon/gigalith_ex_megaton_cannon_test.rs"]
 mod gigalith_ex_megaton_cannon_test;
 #[path = "pokemon/giratina_rayquaza_test.rs"]

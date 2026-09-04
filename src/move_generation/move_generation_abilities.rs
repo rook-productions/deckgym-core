@@ -267,7 +267,7 @@ fn can_use_ability_by_mechanic(
         AbilityMechanic::HealAllYourPokemonDuringCheckup { .. } => false, // passive, during Pokemon Checkup
         // Reactive: only offered via the move-generation stack right after an eligible [R]
         // coin-flip attack, never as a freely-selectable ability.
-        AbilityMechanic::VictoryStarReflip => false,
+        AbilityMechanic::VictoryStarReflip | AbilityMechanic::LuxuryCoinReflip => false,
     }
 }
 

@@ -37,10 +37,11 @@ use super::{
 pub fn apply_action(rng: &mut StdRng, state: &mut State, action: &Action) {
     let outcomes = forecast_action(state, action);
 
-    // Victini's Victory Star: if this is an eligible [R] coin-flip attack, sample the coins now
-    // but park the result instead of committing it, and let the player choose whether to re-flip.
-    if let Some(pending) = maybe_defer_for_victory_star(rng, state, action, &outcomes) {
-        let victini_idx = pending.victini_idx;
+    // Victini's Victory Star / Gholdengo's Luxury Coin: if this is an eligible coin-flip action,
+    // sample the coins now but park the result instead of committing it, and let the player
+    // choose whether to re-flip.
+    if let Some(pending) = maybe_defer_for_coin_reflip(rng, state, action, &outcomes) {
+        let reflipper_idx = pending.reflipper_idx;
         let actor = pending.actor;
         state.set_pending_coin_reflip(pending);
         state.move_generation_stack.push((
@@ -48,7 +49,7 @@ pub fn apply_action(rng: &mut StdRng, state: &mut State, action: &Action) {
             vec![
                 SimpleAction::Noop,
                 SimpleAction::UseAbility {
-                    in_play_idx: victini_idx,
+                    in_play_idx: reflipper_idx,
                 },
             ],
         ));
@@ -65,48 +66,52 @@ pub fn apply_action(rng: &mut StdRng, state: &mut State, action: &Action) {
     }
 }
 
-/// Decides whether `action` should pause for a Victory Star decision, and if so pre-rolls the
-/// coins so the player is choosing with knowledge of the result (as the real card allows).
+/// Decides whether `action` should pause for a coin-reflip Ability decision, and if so pre-rolls
+/// the coins so the player is choosing with knowledge of the result (as the real cards allow).
 ///
 /// Returns `None` — meaning "resolve normally" — unless all of the following hold:
-///   - the action is an `Attack` that is not itself a stacked follow-up,
-///   - the attacking Pokémon is `[R]` (Fire),
-///   - the attack's outcomes actually involve coin flips,
-///   - the acting player has an unused Victini in play,
-///   - no reflip decision is already pending.
-fn maybe_defer_for_victory_star(
+///   - the action is not itself a stacked follow-up and actually involves coin flips,
+///   - no reflip decision is already pending,
+///   - and either
+///       * it is an `Attack` by a `[R]` (Fire) Pokémon and the acting player has an unused
+///         Victini in play (Victory Star), or
+///       * it is a Trainer card being played and the acting player has an unused Gholdengo in
+///         play (Luxury Coin).
+fn maybe_defer_for_coin_reflip(
     rng: &mut StdRng,
     state: &State,
     action: &Action,
     outcomes: &Outcomes,
 ) -> Option<PendingCoinReflip> {
-    let attack = match &action.action {
-        SimpleAction::Attack(attack) if !action.is_stack => attack,
+    if action.is_stack || state.pending_coin_reflip.is_some() || !outcomes.has_coin_flips() {
+        return None;
+    }
+
+    let reflipper_idx = match &action.action {
+        SimpleAction::Attack(_) => {
+            let attacker_is_fire = state.in_play_pokemon[action.actor][0]
+                .as_ref()
+                .and_then(|pokemon| pokemon.card.get_type())
+                .is_some_and(|energy_type| energy_type == EnergyType::Fire);
+            if !attacker_is_fire {
+                return None;
+            }
+            state.available_coin_reflip_idx(action.actor, &AbilityMechanic::VictoryStarReflip)?
+        }
+        SimpleAction::Play { .. } => {
+            state.available_coin_reflip_idx(action.actor, &AbilityMechanic::LuxuryCoinReflip)?
+        }
         _ => return None,
     };
-    if state.pending_coin_reflip.is_some() {
-        return None;
-    }
-    if !outcomes.has_coin_flips() {
-        return None;
-    }
-    let attacker_is_fire = state.in_play_pokemon[action.actor][0]
-        .as_ref()
-        .and_then(|pokemon| pokemon.card.get_type())
-        .is_some_and(|energy_type| energy_type == EnergyType::Fire);
-    if !attacker_is_fire {
-        return None;
-    }
-    let victini_idx = state.available_victory_star_idx(action.actor)?;
 
     // Roll the coins now; the chosen branch's sequence is what the player sees and may reject.
     let original_flips = sample_coin_sequence(rng, outcomes)?;
 
     Some(PendingCoinReflip {
         actor: action.actor,
-        attack: attack.clone(),
+        action: action.action.clone(),
         original_flips,
-        victini_idx,
+        reflipper_idx,
     })
 }
 
@@ -121,7 +126,7 @@ fn sample_coin_sequence(rng: &mut StdRng, outcomes: &Outcomes) -> Option<Vec<boo
     outcomes.coin_sequence_at(chosen_index)
 }
 
-/// Resolves a parked Victory Star decision by re-forecasting the stored attack and either
+/// Resolves a parked coin-reflip decision by re-forecasting the stored action and either
 /// replaying the original coin sequence (`reflip == false`) or committing a fresh, independent
 /// roll (`reflip == true`).
 pub(crate) fn resolve_pending_coin_reflip(
@@ -132,12 +137,18 @@ pub(crate) fn resolve_pending_coin_reflip(
 ) {
     let attack_action = Action {
         actor: pending.actor,
-        action: SimpleAction::Attack(pending.attack.clone()),
+        action: pending.action.clone(),
         is_stack: false,
     };
 
     if reflip {
-        state.mark_victory_star_used(pending.actor);
+        // Which "once per turn" flag to burn depends on the Ability that offered the reflip.
+        if let Some(mechanic) = state.in_play_pokemon[pending.actor][pending.reflipper_idx]
+            .as_ref()
+            .and_then(|pokemon| get_ability_mechanic(&pokemon.card))
+        {
+            state.mark_coin_reflip_used(pending.actor, mechanic);
+        }
     }
 
     let outcomes = forecast_action(state, &attack_action);

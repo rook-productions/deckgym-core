@@ -471,4 +471,11 @@ pub enum AbilityMechanic {
     /// generation, only pushed onto the move-generation stack by `apply_action` immediately
     /// after an eligible [R] attack's coins are flipped. See `PendingCoinReflip`.
     VictoryStarReflip,
+    /// Gholdengo's Luxury Coin: "Once during your turn, when you flip any coins for an effect of
+    /// your Trainer cards, you may ignore all results of those coin flips and begin flipping those
+    /// coins again. You can't use more than 1 Luxury Coin Ability each turn."
+    ///
+    /// The Trainer-card counterpart of `VictoryStarReflip`, resolved through the same
+    /// `PendingCoinReflip` machinery.
+    LuxuryCoinReflip,
 }

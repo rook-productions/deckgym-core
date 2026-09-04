@@ -727,6 +727,10 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
 
         // b4 / b4a mechanics
         map.insert(
+            "Once during your turn, when you flip any coins for an effect of your Trainer cards, you may ignore all results of those coin flips and begin flipping those coins again. You can't use more than 1 Luxury Coin Ability each turn.",
+            AbilityMechanic::LuxuryCoinReflip,
+        );
+        map.insert(
             "Once during your turn, when you play this Pokémon from your hand to evolve 1 of your Pokémon, you may look at the top 4 cards of your deck and put all Item cards you find there into your hand. Shuffle the other cards back into your deck.",
             AbilityMechanic::TakeItemsFromTopOfDeckOnEvolve { amount: 4 },
         );
