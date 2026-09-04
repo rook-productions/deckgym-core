@@ -2356,7 +2356,8 @@ fn milled_card_matches(
         return matches!(card, Card::Trainer(trainer) if trainer.trainer_card_type == *wanted);
     }
     if let Some(wanted) = energy_type {
-        return card.get_type() == Some(wanted);
+        // The milled card comes off the deck, so it is matched on its printed type.
+        return card.is_type(wanted);
     }
     false
 }

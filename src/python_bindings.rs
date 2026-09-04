@@ -154,9 +154,22 @@ impl PyCard {
         self.card.is_ex()
     }
 
+    /// The Pokémon's first printed type. See `energy_types` for the whole printed set.
     #[getter]
     fn energy_type(&self) -> Option<PyEnergyType> {
-        self.card.get_type().map(|t| t.into())
+        self.card.get_types().first().map(|t| (*t).into())
+    }
+
+    /// Every type printed on the card. Today always 0 or 1 entries; dual-type Pokémon will have
+    /// two. For a Pokémon in play, prefer `PlayedCard.energy_types`, which also counts types
+    /// granted by an Ability.
+    #[getter]
+    fn energy_types(&self) -> Vec<PyEnergyType> {
+        self.card
+            .get_types()
+            .into_iter()
+            .map(|t| t.into())
+            .collect()
     }
 
     #[getter]
@@ -281,10 +294,14 @@ impl PyPlayedCard {
         self.played_card.get_name()
     }
 
-    /// The Pokémon's *printed* type, as on the card.
+    /// The Pokémon's first *printed* type, as on the card.
     #[getter]
     fn energy_type(&self) -> Option<PyEnergyType> {
-        self.played_card.card.get_type().map(|t| t.into())
+        self.played_card
+            .card
+            .get_types()
+            .first()
+            .map(|t| (*t).into())
     }
 
     /// Every type this Pokémon counts as while in play: its printed type plus any granted by an

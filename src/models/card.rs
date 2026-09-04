@@ -240,13 +240,6 @@ impl Card {
         }
     }
 
-    pub(crate) fn get_type(&self) -> Option<EnergyType> {
-        match self {
-            Card::Pokemon(pokemon_card) => Some(pokemon_card.energy_type),
-            _ => None,
-        }
-    }
-
     /// The Energy types this card is **printed** as.
     ///
     /// Today every printed Pokémon has exactly one type, so this is always a 0- or 1-element
