@@ -12,7 +12,7 @@ use crate::{
     actions::abilities::AbilityMechanic,
     actions::SimpleAction,
     deck::Deck,
-    effects::TurnEffect,
+    effects::{CardEffect, TurnEffect},
     models::{Card, EnergyType, StatusCondition},
     move_generation,
     stadiums::is_starting_plains_active,
@@ -561,6 +561,45 @@ impl State {
             .expect("Active Pokemon should be there")
     }
 
+    /// Clear Veil: "Prevent all effects of attacks used by your opponent's Pokémon done to the
+    /// Pokémon this card is attached to."
+    ///
+    /// An attack's effects are applied while its user is `current_player`, so a target belonging
+    /// to the *other* player is exactly "done to it by the opponent's attack". Effects a player
+    /// applies to their own Pokémon (their own attack's self-buffs, their own Trainer cards) are
+    /// untouched, matching the card text.
+    pub(crate) fn is_shielded_from_opponent_attack_effects(
+        &self,
+        player: usize,
+        in_play_idx: usize,
+    ) -> bool {
+        if player == self.current_player {
+            return false;
+        }
+        self.in_play_pokemon[player][in_play_idx]
+            .as_ref()
+            .is_some_and(|pokemon| has_tool(pokemon, crate::card_ids::CardId::B4149ClearVeil))
+    }
+
+    /// Adds a `CardEffect` to a Pokémon in play, honouring shields that block effects coming from
+    /// the opponent's attacks (Clear Veil). Prefer this over calling `PlayedCard::add_effect`
+    /// directly whenever the effect is being imposed on a target rather than chosen by its owner.
+    pub(crate) fn add_effect_to_in_play(
+        &mut self,
+        player: usize,
+        in_play_idx: usize,
+        effect: CardEffect,
+        duration: u8,
+    ) {
+        if self.is_shielded_from_opponent_attack_effects(player, in_play_idx) {
+            debug!("Clear Veil: Preventing {effect:?} from the opponent's attack");
+            return;
+        }
+        if let Some(pokemon) = self.in_play_pokemon[player][in_play_idx].as_mut() {
+            pokemon.add_effect(effect, duration);
+        }
+    }
+
     /// Apply a status condition to a Pokémon in play, enforcing all immunity rules.
     /// This is the single authoritative path for setting status conditions.
     pub fn apply_status_condition(
@@ -590,6 +629,11 @@ impl State {
             && pokemon.get_energy_type() == Some(EnergyType::Metal)
         {
             debug!("Steel Apron: Pokémon is immune to status conditions");
+            return;
+        }
+
+        if self.is_shielded_from_opponent_attack_effects(player, in_play_idx) {
+            debug!("Clear Veil: Preventing a Special Condition from the opponent's attack");
             return;
         }
 
@@ -673,6 +717,23 @@ impl State {
         self.discard_energies[ko_receiver].extend(ko_pokemon.attached_energy.iter().cloned());
         self.in_play_pokemon[ko_receiver][ko_pokemon_idx] = None;
         self.refresh_double_grass_bonus_for_player(ko_receiver);
+    }
+
+    /// Like `discard_from_play`, but the Pokémon itself (and its evolution chain) goes to its
+    /// owner's hand instead of the discard pile. Any attached Tool and Energy still go to the
+    /// discard — only the Pokémon cards are rescued (e.g. Rescue Scarf).
+    pub(crate) fn return_from_play_to_hand(&mut self, player: usize, in_play_idx: usize) {
+        let played_card = self.in_play_pokemon[player][in_play_idx]
+            .take()
+            .expect("There should be a Pokemon to return to hand");
+        let mut cards_to_hand = played_card.cards_behind.clone();
+        cards_to_hand.push(played_card.card.clone());
+        self.hands[player].extend(cards_to_hand);
+        if let Some(tool_card) = &played_card.attached_tool {
+            self.discard_piles[player].push(tool_card.clone());
+        }
+        self.discard_energies[player].extend(played_card.attached_energy.iter().cloned());
+        self.refresh_double_grass_bonus_for_player(player);
     }
 
     /// Removes the attached tool from a Pokémon and puts the tool card into the discard pile.

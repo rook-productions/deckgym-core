@@ -123,6 +123,23 @@ pub enum TurnEffect {
         player: usize,
         attacker_must_be_ex: bool,
     },
+    /// All of `player`'s Pokémon take `amount` less damage from attacks from the opponent's
+    /// Pokémon (e.g. Blue). The untargeted sibling of `ReducedDamageForType` /
+    /// `ReducedDamageForSpecificPokemon`; like those it covers Benched Pokémon too, since the
+    /// wording is "all of your Pokémon".
+    ReducedDamageForAllPokemon {
+        amount: u32,
+        player: usize,
+    },
+    /// If one of `player`'s Pokémon named in `pokemon_names` would be Knocked Out by damage from
+    /// an attack, it is not Knocked Out and its remaining HP becomes `remaining_hp` (e.g. Hala,
+    /// protecting Hariyama and Crabominable). The deterministic, turn-scoped counterpart of
+    /// Ursaluna's coin-flip Guts ability; resolved in `handle_knockouts`.
+    SurviveKnockOutForSpecificPokemon {
+        pokemon_names: Vec<String>,
+        player: usize,
+        remaining_hp: u32,
+    },
     IncreasedDamage {
         amount: u32,
     },

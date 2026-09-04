@@ -1,7 +1,7 @@
 use std::{collections::HashMap, panic};
 
 use log::debug;
-use rand::{distributions::WeightedIndex, prelude::Distribution, rngs::StdRng};
+use rand::{distributions::WeightedIndex, prelude::Distribution, rngs::StdRng, Rng};
 
 use crate::{
     actions::effect_ability_mechanic_map::{get_ability_mechanic, has_ability_mechanic},
@@ -208,6 +208,11 @@ pub fn forecast_action(state: &State, action: &Action) -> Outcomes {
         | SimpleAction::MoveRandomOpponentEnergyToActive { .. }
         | SimpleAction::ApplyStatusToOpponentActive { .. }
         | SimpleAction::ApplyStatusesToOpponentActive { .. }
+        | SimpleAction::HealAndCureConditions { .. }
+        | SimpleAction::MoveDamageToOpponentActive { .. }
+        | SimpleAction::BenchOpponentPokemonFromDiscard { .. }
+        | SimpleAction::ShuffleOwnDeck
+        | SimpleAction::ShuffleRandomOwnHandCardIntoDeck
         | SimpleAction::MoveOpponentActiveEnergyToSelf { .. } => forecast_deterministic_action(),
         // Noop is the "decline" branch of Victini's Victory Star prompt when a coin result is
         // parked; otherwise it is an ordinary no-op ("say no" to an optional effect).
@@ -323,8 +328,8 @@ fn forecast_decline_coin_reflip() -> Outcomes {
 }
 
 fn forecast_deterministic_action() -> Outcomes {
-    Outcomes::single_fn(move |_, state, action| {
-        apply_deterministic_action(state, action);
+    Outcomes::single_fn(move |rng, state, action| {
+        apply_deterministic_action(rng, state, action);
     })
 }
 
@@ -403,7 +408,7 @@ fn forecast_apply_damage(
     Outcomes::from_parts(probabilities, mutations)
 }
 
-fn apply_deterministic_action(state: &mut State, action: &Action) {
+fn apply_deterministic_action(rng: &mut StdRng, state: &mut State, action: &Action) {
     match &action.action {
         SimpleAction::DrawCard { amount } => {
             for _ in 0..*amount {
@@ -551,9 +556,81 @@ fn apply_deterministic_action(state: &mut State, action: &Action) {
             let opponent = (action.actor + 1) % 2;
             apply_move_energy_between_players(state, opponent, 0, action.actor, *to_in_play_idx);
         }
+        SimpleAction::HealAndCureConditions {
+            in_play_idx,
+            amount,
+            conditions,
+        } => {
+            if let Some(pokemon) = state.in_play_pokemon[action.actor][*in_play_idx].as_mut() {
+                pokemon.heal(*amount);
+                for condition in conditions {
+                    pokemon.clear_status_condition(*condition);
+                }
+            }
+        }
+        SimpleAction::MoveDamageToOpponentActive {
+            from_in_play_idx,
+            amount,
+        } => apply_move_damage_to_opponent_active(state, action.actor, *from_in_play_idx, *amount),
+        SimpleAction::BenchOpponentPokemonFromDiscard { card } => {
+            apply_bench_opponent_pokemon_from_discard(state, action.actor, card)
+        }
+        SimpleAction::ShuffleOwnDeck => state.decks[action.actor].shuffle(false, rng),
+        SimpleAction::ShuffleRandomOwnHandCardIntoDeck => {
+            if !state.hands[action.actor].is_empty() {
+                let idx = rng.gen_range(0..state.hands[action.actor].len());
+                let card = state.hands[action.actor].remove(idx);
+                debug!("Shuffling {card} from hand into deck");
+                state.decks[action.actor].cards.push(card);
+                state.decks[action.actor].shuffle(false, rng);
+            }
+        }
         SimpleAction::Noop => {}
         _ => panic!("Deterministic Action expected"),
     }
+}
+
+/// Acerola: move up to `amount` damage from one of the actor's own Pokémon onto the opponent's
+/// Active Pokémon. Only the damage actually present is moved, so a Pokémon with 20 damage moves
+/// 20 rather than conjuring the full amount.
+fn apply_move_damage_to_opponent_active(
+    state: &mut State,
+    actor: usize,
+    from_in_play_idx: usize,
+    amount: u32,
+) {
+    let opponent = (actor + 1) % 2;
+    let moved = {
+        let Some(source) = state.in_play_pokemon[actor][from_in_play_idx].as_mut() else {
+            return;
+        };
+        let moved = amount.min(source.get_damage_counters());
+        source.heal(moved);
+        moved
+    };
+    if moved == 0 || state.in_play_pokemon[opponent][0].is_none() {
+        return;
+    }
+    // Not an attack, so no weakness/damage modifiers apply — mirrors how other "place damage
+    // counters" effects resolve.
+    state.in_play_pokemon[opponent][0]
+        .as_mut()
+        .expect("Opponent active should be there")
+        .apply_damage(moved);
+    handle_knockouts(state, (actor, 0), false);
+}
+
+/// Pokémon Flute: put a Basic Pokémon from the opponent's discard pile onto their Bench.
+fn apply_bench_opponent_pokemon_from_discard(state: &mut State, actor: usize, card: &Card) {
+    let opponent = (actor + 1) % 2;
+    let Some(discard_idx) = state.discard_piles[opponent].iter().position(|c| c == card) else {
+        return;
+    };
+    let Some(bench_idx) = (1..4).find(|i| state.in_play_pokemon[opponent][*i].is_none()) else {
+        return;
+    };
+    let card = state.discard_piles[opponent].remove(discard_idx);
+    place_pokemon_in_play(state, opponent, &card, bench_idx);
 }
 
 fn apply_attach_energy(
@@ -669,15 +746,7 @@ pub(crate) fn apply_place_card(
     index: usize,
     from_deck: bool,
 ) {
-    let played_card = to_playable_card(card, true);
-    state.in_play_pokemon[actor][index] = Some(played_card);
-    state.refresh_starting_plains_bonus_for_idx(actor, index);
-    state.refresh_double_grass_bonus_for_player(actor);
-    // SoothingWind (Ogerpon ex) / Flower Shield (Comfey): cure status conditions on entry.
-    if let Some(AbilityMechanic::SoothingWind { energy_type }) = get_ability_mechanic(card) {
-        debug!("SoothingWind: Pokémon entered play – curing status conditions for player {actor}");
-        state.apply_soothing_wind_for_player(actor, energy_type.as_ref());
-    }
+    place_pokemon_in_play(state, actor, card, index);
     if from_deck {
         state.remove_card_from_deck(actor, card);
     } else {
@@ -689,6 +758,22 @@ pub(crate) fn apply_place_card(
         if placed_in_bench {
             on_bench_from_hand(actor, state, card, index);
         }
+    }
+}
+
+/// Puts `card` into `actor`'s in-play slot `index` and runs the on-entry bookkeeping, without
+/// removing the card from any source zone. Callers that move a card out of the hand or deck
+/// should use `apply_place_card`; this is for zones that have no dedicated path (e.g. Pokémon
+/// Flute, which benches a Basic straight out of the discard pile).
+pub(crate) fn place_pokemon_in_play(state: &mut State, actor: usize, card: &Card, index: usize) {
+    let played_card = to_playable_card(card, true);
+    state.in_play_pokemon[actor][index] = Some(played_card);
+    state.refresh_starting_plains_bonus_for_idx(actor, index);
+    state.refresh_double_grass_bonus_for_player(actor);
+    // SoothingWind (Ogerpon ex) / Flower Shield (Comfey): cure status conditions on entry.
+    if let Some(AbilityMechanic::SoothingWind { energy_type }) = get_ability_mechanic(card) {
+        debug!("SoothingWind: Pokémon entered play – curing status conditions for player {actor}");
+        state.apply_soothing_wind_for_player(actor, energy_type.as_ref());
     }
 }
 

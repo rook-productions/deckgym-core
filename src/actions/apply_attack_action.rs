@@ -1478,9 +1478,7 @@ fn inflict_status_conditions_and_card_effect(
         for condition in &conditions {
             state.apply_status_condition(opponent, 0, *condition);
         }
-        if let Some(defender) = state.in_play_pokemon[opponent][0].as_mut() {
-            defender.add_effect(effect.clone(), duration);
-        }
+        state.add_effect_to_in_play(opponent, 0, effect.clone(), duration);
     })
 }
 
@@ -3150,9 +3148,7 @@ fn self_heal_and_card_effect_attack(
         } else {
             action.actor
         };
-        if let Some(pokemon) = state.in_play_pokemon[target][0].as_mut() {
-            pokemon.add_effect(effect.clone(), effect_duration);
-        }
+        state.add_effect_to_in_play(target, 0, effect.clone(), effect_duration);
     })
 }
 
@@ -3247,9 +3243,7 @@ fn damage_and_card_effect_attack(
         } else {
             action.actor
         };
-        state
-            .get_active_mut(player)
-            .add_effect(effect.clone(), effect_duration);
+        state.add_effect_to_in_play(player, 0, effect.clone(), effect_duration);
     };
 
     if coin_flip {
@@ -3274,9 +3268,7 @@ fn coin_flip_no_damage_or_damage_and_card_effect_attack(
         } else {
             action.actor
         };
-        state
-            .get_active_mut(player)
-            .add_effect(effect.clone(), effect_duration);
+        state.add_effect_to_in_play(player, 0, effect.clone(), effect_duration);
     };
 
     AttackOutcomes::binary_coin(
@@ -4285,11 +4277,10 @@ fn discard_hand_cards_required_attack(
 fn block_basic_attack(damage: u32) -> AttackOutcomes {
     active_damage_effect_doutcome(damage, move |_, state, action| {
         let opponent = (action.actor + 1) % 2;
-        let opponent_active = state.get_active_mut(opponent);
 
         // Check if the defending Pokemon is a Basic Pokemon (stage 0)
-        if opponent_active.card.is_basic() {
-            opponent_active.add_effect(CardEffect::CannotAttack, 1);
+        if state.get_active(opponent).card.is_basic() {
+            state.add_effect_to_in_play(opponent, 0, CardEffect::CannotAttack, 1);
         }
     })
 }
@@ -4723,9 +4714,8 @@ fn damage_and_multiple_card_effects_attack(
         } else {
             action.actor
         };
-        let target_pokemon = state.get_active_mut(player);
         for effect in effects.iter() {
-            target_pokemon.add_effect(effect.clone(), effect_duration);
+            state.add_effect_to_in_play(player, 0, effect.clone(), effect_duration);
         }
     })
 }
@@ -5134,9 +5124,7 @@ fn extra_damage_if_card_in_discard_attack(
 fn coin_flip_to_block_attack_next_turn(damage: u32) -> AttackOutcomes {
     active_damage_effect_doutcome(damage, move |_, state, action| {
         let opponent = (action.actor + 1) % 2;
-        state
-            .get_active_mut(opponent)
-            .add_effect(CardEffect::CoinFlipToBlockAttack, 1);
+        state.add_effect_to_in_play(opponent, 0, CardEffect::CoinFlipToBlockAttack, 1);
     })
 }
 

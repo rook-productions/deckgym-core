@@ -223,6 +223,29 @@ pub enum SimpleAction {
     ApplyStatusesToOpponentActive {
         conditions: Vec<StatusCondition>,
     },
+    /// Whitney: heal a Pokémon and cure only the listed Special Conditions (unlike
+    /// `Heal { cure_status: true }`, which cures every condition).
+    HealAndCureConditions {
+        in_play_idx: usize,
+        amount: u32,
+        conditions: Vec<StatusCondition>,
+    },
+    /// Acerola: move `amount` damage from one of the actor's own Pokémon onto the opponent's
+    /// Active Pokémon.
+    MoveDamageToOpponentActive {
+        from_in_play_idx: usize,
+        amount: u32,
+    },
+    /// Pokémon Flute: put a Basic Pokémon from the opponent's discard pile onto their Bench.
+    BenchOpponentPokemonFromDiscard {
+        card: Card,
+    },
+    /// Rotom Dex: "Then, you may shuffle your deck." The decline branch is `Noop`.
+    ShuffleOwnDeck,
+    /// Dark Pendant: the actor reveals a random card from their own hand and shuffles it into
+    /// their deck. Queued as the single option on the move-generation stack (like Bouncy Body) so
+    /// that it resolves with the shared RNG available; it is not a real choice.
+    ShuffleRandomOwnHandCardIntoDeck,
     Noop, // No operation, used to have the user say "no" to a question
 }
 
@@ -433,6 +456,29 @@ impl fmt::Display for SimpleAction {
             }
             SimpleAction::MoveOpponentActiveEnergyToSelf { to_in_play_idx } => {
                 write!(f, "MoveOpponentActiveEnergyToSelf({to_in_play_idx})")
+            }
+            SimpleAction::HealAndCureConditions {
+                in_play_idx,
+                amount,
+                conditions,
+            } => {
+                write!(
+                    f,
+                    "HealAndCureConditions({in_play_idx}, {amount}, {conditions:?})"
+                )
+            }
+            SimpleAction::MoveDamageToOpponentActive {
+                from_in_play_idx,
+                amount,
+            } => {
+                write!(f, "MoveDamageToOpponentActive({from_in_play_idx}, {amount})")
+            }
+            SimpleAction::BenchOpponentPokemonFromDiscard { card } => {
+                write!(f, "BenchOpponentPokemonFromDiscard({card})")
+            }
+            SimpleAction::ShuffleOwnDeck => write!(f, "ShuffleOwnDeck"),
+            SimpleAction::ShuffleRandomOwnHandCardIntoDeck => {
+                write!(f, "ShuffleRandomOwnHandCardIntoDeck")
             }
             SimpleAction::Noop => write!(f, "Noop"),
         }
