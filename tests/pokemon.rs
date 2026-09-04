@@ -406,6 +406,8 @@ mod toxtricity_ex_damaging_spark_test;
 mod typhlosion_fire_breath_test;
 #[path = "pokemon/ursaluna_guts_test.rs"]
 mod ursaluna_guts_test;
+#[path = "pokemon/urshifu_double_type_test.rs"]
+mod urshifu_double_type_test;
 #[path = "pokemon/vanilluxe_test.rs"]
 mod vanilluxe_test;
 #[path = "pokemon/vaporeon_ex_test.rs"]

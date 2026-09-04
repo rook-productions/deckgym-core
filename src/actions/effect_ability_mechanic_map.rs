@@ -667,8 +667,21 @@ pub static EFFECT_ABILITY_MECHANIC_MAP: LazyLock<HashMap<&'static str, AbilityMe
         );
 
         // b3 mechanics
-        // map.insert("As long as this Pokémon is in play, it is [F] and [D] type.", todo_implementation);
-        // map.insert("As long as this Pokémon is in play, it is [W] and [F] type.", todo_implementation);
+        // Urshifu's Double Type. The printed type is unioned in by
+        // `PlayedCard::get_energy_types`, so the listed types are what the card *adds*; listing
+        // the printed one again is harmless (it is deduplicated).
+        map.insert(
+            "As long as this Pokémon is in play, it is [F] and [D] type.",
+            AbilityMechanic::GrantedTypes {
+                energy_types: vec![EnergyType::Fighting, EnergyType::Darkness],
+            },
+        );
+        map.insert(
+            "As long as this Pokémon is in play, it is [W] and [F] type.",
+            AbilityMechanic::GrantedTypes {
+                energy_types: vec![EnergyType::Water, EnergyType::Fighting],
+            },
+        );
         map.insert(
             "As long as this Pokémon is on your Bench, your Active [D] Pokémon's Retreat Cost is 1 less.",
             AbilityMechanic::ReduceRetreatCostOfYourActiveTypedFromBench {
