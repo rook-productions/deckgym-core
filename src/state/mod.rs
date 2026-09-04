@@ -222,9 +222,9 @@ impl State {
             collect_typed_hp_bonuses(self, 0),
             collect_typed_hp_bonuses(self, 1),
         ];
-        for player in 0..2 {
-            for pokemon in self.in_play_pokemon[player].iter_mut().flatten() {
-                pokemon.refresh_ability_board_bonuses(&typed_hp_bonuses[player], heal_blocked);
+        for (board, bonuses) in self.in_play_pokemon.iter_mut().zip(&typed_hp_bonuses) {
+            for pokemon in board.iter_mut().flatten() {
+                pokemon.refresh_ability_board_bonuses(bonuses, heal_blocked);
             }
         }
     }
