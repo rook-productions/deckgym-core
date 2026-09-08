@@ -294,10 +294,30 @@ fn apply_pokemon_checkup(
         debug!("{player}'s Pokemon {in_play_idx} woke up");
     }
 
+    // In-app Tips: a Paralyzed Pokemon "cannot attack or retreat. After its owner's next turn,
+    // it recovers during Pokemon Checkup."
+    //
+    // This Checkup ends `current_player`'s turn -- `advance_turn` runs after it, in
+    // `finish_turn_after_checkup` -- so it may only clear Paralysis on that player's OWN
+    // Pokemon, and even then not when the Paralysis was inflicted during this very turn: the
+    // turn it landed on is not yet "its owner's next turn". That covers both the ordinary case
+    // (inflicted on the opponent's turn: this Checkup skips it, the owner's whole next turn is
+    // denied, the Checkup after that clears it) and a Paralysis applied during the owner's own
+    // turn (which then survives the intervening opponent turn and denies the owner's following
+    // turn instead).
+    let ending_player = mutated_state.current_player;
+    let ending_turn = mutated_state.turn_count;
     for (player, in_play_idx) in checkup_targets.paralyzed.iter().copied() {
+        if player != ending_player {
+            continue;
+        }
         let Some(pokemon) = mutated_state.in_play_pokemon[player][in_play_idx].as_mut() else {
             continue;
         };
+        if pokemon.paralyzed_on_turn() == Some(ending_turn) {
+            debug!("{player}'s Pokemon {in_play_idx} was paralyzed this turn; it stays Paralyzed");
+            continue;
+        }
         pokemon.clear_status_condition(StatusCondition::Paralyzed);
         debug!("{player}'s Pokemon {in_play_idx} is un-paralyzed");
     }
