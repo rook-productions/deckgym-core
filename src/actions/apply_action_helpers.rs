@@ -32,6 +32,12 @@ pub(crate) type Mutations = Vec<Mutation>;
 
 #[derive(Clone)]
 struct CheckupTargets {
+    /// Every Pokemon carrying at least one Checkup-relevant Special Condition, in the order the
+    /// in-app Tips panel prescribes: "If both players' Pokemon are affected by Special
+    /// Conditions, the player whose turn just ended checks their Special Conditions first", and
+    /// within a side the Active Spot before the Bench. Each Pokemon's own conditions are then
+    /// resolved Poisoned -> Burned -> Asleep -> Paralyzed.
+    order: Vec<(usize, usize)>,
     sleeps: Vec<(usize, usize)>,
     paralyzed: Vec<(usize, usize)>,
     poisoned: Vec<(usize, usize)>,
@@ -192,27 +198,39 @@ fn get_poison_damage(state: &State, player: usize, in_play_idx: usize) -> u32 {
 
 fn collect_checkup_targets(state: &State) -> CheckupTargets {
     let mut targets = CheckupTargets {
+        order: vec![],
         sleeps: vec![],
         paralyzed: vec![],
         poisoned: vec![],
         burned: vec![],
     };
 
-    for player in 0..2 {
+    // "the player whose turn just ended checks their Special Conditions first". Checkup runs
+    // before `advance_turn`, so the player whose turn just ended is still `current_player`.
+    let ending_player = state.current_player;
+    for player in [ending_player, (ending_player + 1) % 2] {
         for (i, pokemon) in state.enumerate_in_play_pokemon(player) {
-            if pokemon.is_asleep() {
-                targets.sleeps.push((player, i));
-            }
-            if pokemon.is_paralyzed() {
-                targets.paralyzed.push((player, i));
-            }
+            let mut has_any = false;
             if pokemon.is_poisoned() {
                 targets.poisoned.push((player, i));
                 debug!("{player}'s Pokemon {i} is poisoned");
+                has_any = true;
             }
             if pokemon.is_burned() {
                 targets.burned.push((player, i));
                 debug!("{player}'s Pokemon {i} is burned");
+                has_any = true;
+            }
+            if pokemon.is_asleep() {
+                targets.sleeps.push((player, i));
+                has_any = true;
+            }
+            if pokemon.is_paralyzed() {
+                targets.paralyzed.push((player, i));
+                has_any = true;
+            }
+            if has_any {
+                targets.order.push((player, i));
             }
         }
     }
@@ -229,97 +247,90 @@ fn apply_pokemon_checkup(
     let num_sleeps = checkup_targets.sleeps.len();
     debug_assert!(outcome.len() >= num_sleeps + checkup_targets.burned.len());
 
-    // Official Pokemon Checkup order: Poisoned -> Burned -> Asleep -> Paralyzed.
-    for (player, in_play_idx) in checkup_targets.poisoned.iter().copied() {
-        if mutated_state.in_play_pokemon[player][in_play_idx].is_none() {
-            continue;
-        }
-        let attacking_ref = (player, in_play_idx); // present it as self-damage
-        let poison_damage = get_poison_damage(mutated_state, player, in_play_idx);
-
-        // Knockout checks are deferred to the end of the whole end-of-turn/checkup sequence (see
-        // `handle_knockouts` call in `forecast_pokemon_checkup`), so that other checkup effects
-        // (e.g. Garganacl's Blessed Salt heal, below) get a chance to apply before a Pokémon that
-        // took lethal damage here is actually removed from play.
-        handle_damage_only(
-            mutated_state,
-            attacking_ref,
-            &[(poison_damage, player, in_play_idx)],
-            false,
-            DamageModifierContext::default(),
-        );
-    }
-
-    // Burn always deals 20 damage, then coin flip for healing
-    for (i, (player, in_play_idx)) in checkup_targets.burned.iter().copied().enumerate() {
-        if mutated_state.in_play_pokemon[player][in_play_idx].is_none() {
-            continue;
-        }
-
-        let attacking_ref = (player, in_play_idx); // present it as self-damage
-                                                   // Deferred knockout check — see comment above the poison damage call.
-        handle_damage_only(
-            mutated_state,
-            attacking_ref,
-            &[(20, player, in_play_idx)],
-            false,
-            DamageModifierContext::default(),
-        );
-
-        let heals_from_burn = outcome[num_sleeps + i];
-        if !heals_from_burn {
-            continue;
-        }
-        let Some(pokemon) = mutated_state.in_play_pokemon[player][in_play_idx].as_mut() else {
-            continue;
-        };
-        pokemon.clear_status_condition(StatusCondition::Burned);
-        debug!("{player}'s Pokemon {in_play_idx} healed from burn");
-    }
-
-    // Handle sleep coin flips after poison/burn damage has resolved.
-    for ((player, in_play_idx), is_awake) in checkup_targets
-        .sleeps
-        .iter()
-        .copied()
-        .zip(&outcome[0..num_sleeps])
-    {
-        if !*is_awake {
-            continue;
-        }
-        let Some(pokemon) = mutated_state.in_play_pokemon[player][in_play_idx].as_mut() else {
-            continue;
-        };
-        pokemon.clear_status_condition(StatusCondition::Asleep);
-        debug!("{player}'s Pokemon {in_play_idx} woke up");
-    }
-
-    // In-app Tips: a Paralyzed Pokemon "cannot attack or retreat. After its owner's next turn,
-    // it recovers during Pokemon Checkup."
+    // In-app Tips, "What is Pokemon Checkup?": each Pokemon's own Special Conditions resolve in
+    // the order Poisoned -> Burned -> Asleep -> Paralyzed, and when both players have afflicted
+    // Pokemon, "the player whose turn just ended checks their Special Conditions first".
+    // `checkup_targets.order` is built in exactly that order, so one pass over it is the whole
+    // rule.
     //
-    // This Checkup ends `current_player`'s turn -- `advance_turn` runs after it, in
-    // `finish_turn_after_checkup` -- so it may only clear Paralysis on that player's OWN
-    // Pokemon, and even then not when the Paralysis was inflicted during this very turn: the
-    // turn it landed on is not yet "its owner's next turn". That covers both the ordinary case
-    // (inflicted on the opponent's turn: this Checkup skips it, the owner's whole next turn is
-    // denied, the Checkup after that clears it) and a Paralysis applied during the owner's own
-    // turn (which then survives the intervening opponent turn and denies the owner's following
-    // turn instead).
+    // Knock Outs are deliberately NOT resolved in this loop: "Any Pokemon that has no HP
+    // remaining at the end of Pokemon Checkup is Knocked Out", so the single `handle_knockouts`
+    // call that closes the end-of-turn sequence (see `forecast_pokemon_checkup`) decides them
+    // all at once -- after the healing and Checkup abilities below have had their chance.
     let ending_player = mutated_state.current_player;
     let ending_turn = mutated_state.turn_count;
-    for (player, in_play_idx) in checkup_targets.paralyzed.iter().copied() {
-        if player != ending_player {
+
+    for (player, in_play_idx) in checkup_targets.order.iter().copied() {
+        if mutated_state.in_play_pokemon[player][in_play_idx].is_none() {
             continue;
         }
-        let Some(pokemon) = mutated_state.in_play_pokemon[player][in_play_idx].as_mut() else {
-            continue;
-        };
-        if pokemon.paralyzed_on_turn() == Some(ending_turn) {
-            debug!("{player}'s Pokemon {in_play_idx} was paralyzed this turn; it stays Paralyzed");
-            continue;
+
+        // 1. Poisoned: "take 10 damage during each Pokemon Checkup" (unless an attack replaced
+        //    the usual amount).
+        if checkup_targets.poisoned.contains(&(player, in_play_idx)) {
+            let poison_damage = get_poison_damage(mutated_state, player, in_play_idx);
+            handle_damage_only(
+                mutated_state,
+                (player, in_play_idx), // present it as self-damage
+                &[(poison_damage, player, in_play_idx)],
+                false,
+                DamageModifierContext::default(),
+            );
         }
-        pokemon.clear_status_condition(StatusCondition::Paralyzed);
-        debug!("{player}'s Pokemon {in_play_idx} is un-paralyzed");
+
+        // 2. Burned: 20 damage, then a coin flip -- on heads the Pokemon recovers.
+        if let Some(burn_flip) = checkup_targets
+            .burned
+            .iter()
+            .position(|target| *target == (player, in_play_idx))
+        {
+            handle_damage_only(
+                mutated_state,
+                (player, in_play_idx), // present it as self-damage
+                &[(20, player, in_play_idx)],
+                false,
+                DamageModifierContext::default(),
+            );
+            if outcome[num_sleeps + burn_flip] {
+                if let Some(pokemon) = mutated_state.in_play_pokemon[player][in_play_idx].as_mut() {
+                    pokemon.clear_status_condition(StatusCondition::Burned);
+                    debug!("{player}'s Pokemon {in_play_idx} healed from burn");
+                }
+            }
+        }
+
+        // 3. Asleep: a coin flip -- on heads the Pokemon recovers, on tails it stays Asleep.
+        if let Some(sleep_flip) = checkup_targets
+            .sleeps
+            .iter()
+            .position(|target| *target == (player, in_play_idx))
+        {
+            if outcome[sleep_flip] {
+                if let Some(pokemon) = mutated_state.in_play_pokemon[player][in_play_idx].as_mut() {
+                    pokemon.clear_status_condition(StatusCondition::Asleep);
+                    debug!("{player}'s Pokemon {in_play_idx} woke up");
+                }
+            }
+        }
+
+        // 4. Paralyzed: "After its owner's next turn, it recovers during Pokemon Checkup." So it
+        //    clears only at a Checkup that ends its OWN owner's turn, and not at the one ending
+        //    the turn it was inflicted on -- that turn is not yet "its owner's next turn". This
+        //    covers both the ordinary case (inflicted on the opponent's turn, so the owner's
+        //    whole next turn is denied) and a Paralysis applied during the owner's own turn,
+        //    which survives the intervening opponent turn and denies the owner's turn after it.
+        if checkup_targets.paralyzed.contains(&(player, in_play_idx)) && player == ending_player {
+            if let Some(pokemon) = mutated_state.in_play_pokemon[player][in_play_idx].as_mut() {
+                if pokemon.paralyzed_on_turn() == Some(ending_turn) {
+                    debug!(
+                        "{player}'s Pokemon {in_play_idx} was paralyzed this turn; it stays Paralyzed"
+                    );
+                } else {
+                    pokemon.clear_status_condition(StatusCondition::Paralyzed);
+                    debug!("{player}'s Pokemon {in_play_idx} is un-paralyzed");
+                }
+            }
+        }
     }
 
     apply_checkup_healing_abilities(mutated_state);
