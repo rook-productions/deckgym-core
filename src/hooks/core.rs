@@ -1235,6 +1235,13 @@ fn attack_ignores_opponent_active_effects(context: DamageModifierContext<'_>) ->
     attack_effect_ignores_opponent_active_effects(context.attack_effect)
 }
 
+/// Weakness applies **only** to attack damage dealt to the opponent's Active Pokémon.
+///
+/// In-app Tips, "Use your Pokémon's attacks": "Don't apply Weakness for Benched Pokémon."
+/// That is what the `is_active_to_active` gate below enforces, and it also settles Bounded
+/// Field (the ×2-Weakness Stadium): it only ever amplifies a Weakness that already applies,
+/// so it is Active-only for the same reason. Damage from a spread attack's Bench portion, and
+/// damage that is not from an attack at all, are unmodified.
 fn get_weakness_application(
     state: &State,
     is_active_to_active: bool,

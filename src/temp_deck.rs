@@ -54,14 +54,19 @@ fn dedupe_staples_by_name(deck: String, card: &Card) -> String {
     let tested_id = card.get_id();
     let tested_name = card.get_name();
     let mut lines: Vec<String> = deck.lines().map(str::to_string).collect();
-    let mut names_in_deck: HashSet<String> =
-        lines.iter().filter_map(|l| deck_line_card(l)).map(|(_, name)| name).collect();
+    let mut names_in_deck: HashSet<String> = lines
+        .iter()
+        .filter_map(|l| deck_line_card(l))
+        .map(|(_, name)| name)
+        .collect();
     // The first line carrying the tested card's own id is the card under test; any further line
     // with that id (a template staple that happens to be the same printing) or with the same name
     // under another printing is a collision.
     let mut seen_tested_line = false;
     for line in lines.iter_mut() {
-        let Some((id, name)) = deck_line_card(line) else { continue };
+        let Some((id, name)) = deck_line_card(line) else {
+            continue;
+        };
         if id == tested_id && !seen_tested_line {
             seen_tested_line = true;
             continue;
