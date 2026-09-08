@@ -867,8 +867,28 @@ pub(crate) fn handle_knockouts(
     // If game ends because of knockouts, set winner and return so as to short-circuit promotion logic
     // Note even attacking player can lose by counterattack K.O.
     if state.points[0] >= 3 && state.points[1] >= 3 {
-        debug!("Both players have 3 points, it's a tie");
-        state.winner = Some(GameOutcome::Tie);
+        // Both players reached the target on the same action. In-app Tips: "If a player doesn't
+        // have any Pokemon remaining in play, that player loses the battle regardless of the
+        // number of points each player has." So an empty board still loses here -- a
+        // simultaneous point win does not rescue it into a tie. It is only a tie when the
+        // no-Pokemon rule cannot separate the players: either both still have Pokemon, or
+        // neither does.
+        let p0_has_pokemon = state.enumerate_in_play_pokemon(0).next().is_some();
+        let p1_has_pokemon = state.enumerate_in_play_pokemon(1).next().is_some();
+        state.winner = Some(match (p0_has_pokemon, p1_has_pokemon) {
+            (false, true) => {
+                debug!("Both players have 3 points, but player 0 has no Pokemon left and loses");
+                GameOutcome::Win(1)
+            }
+            (true, false) => {
+                debug!("Both players have 3 points, but player 1 has no Pokemon left and loses");
+                GameOutcome::Win(0)
+            }
+            _ => {
+                debug!("Both players have 3 points, it's a tie");
+                GameOutcome::Tie
+            }
+        });
         return;
     } else if state.points[0] >= 3 {
         state.winner = Some(GameOutcome::Win(0));
