@@ -9,6 +9,13 @@ use crate::{
     Deck, Game, State,
 };
 
+/// Iterations used by the bare player code `mr`, unchanged from when this player was `m`.
+pub const DEFAULT_ITERATIONS: u64 = 100;
+
+/// The original random-rollout MCTS, reachable as `mr`. It builds its tree over concrete `State`s
+/// (so it treats the opponent's actual hand as known), selects children uniformly at random rather
+/// than by UCB, and estimates a position by playing it out to the end with two `RandomPlayer`s.
+/// Kept as the comparison baseline for `MctsInformedPlayer`.
 pub struct MctsPlayer {
     pub deck: Deck,
     pub iterations: u64, // Number of iterations for MCTS

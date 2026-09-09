@@ -3,6 +3,7 @@ mod end_turn_player;
 mod evolution_rusher_player;
 mod expectiminimax_player;
 mod human_player;
+mod mcts_informed_player;
 mod mcts_player;
 mod opponent_aware_player;
 mod random_player;
@@ -15,6 +16,7 @@ pub use end_turn_player::EndTurnPlayer;
 pub use evolution_rusher_player::EvolutionRusherPlayer;
 pub use expectiminimax_player::{ExpectiMiniMaxPlayer, ValueFunction};
 pub use human_player::HumanPlayer;
+pub use mcts_informed_player::MctsInformedPlayer;
 pub use mcts_player::MctsPlayer;
 #[cfg(feature = "test-utils")]
 pub use opponent_aware_player::determinise_opponent_hand_for_test;
@@ -46,7 +48,14 @@ pub enum PlayerCode {
     R,
     H,
     W,
-    M,
+    /// Value-guided information-set MCTS (`m`, `m500`).
+    M {
+        iterations: u64,
+    },
+    /// The older random-rollout MCTS, kept for comparison (`mr`, `mr500`).
+    MR {
+        iterations: u64,
+    },
     V,
     E {
         max_depth: usize,
@@ -75,7 +84,8 @@ pub enum PlayerCode {
 /// | `et` | end the turn immediately |
 /// | `er` | evolution rusher |
 /// | `v` | one-ply greedy on a small hand-set value function |
-/// | `m` | MCTS, 100 iterations |
+/// | `m`, `m<iterations>` | value-guided information-set MCTS, default 200 iterations |
+/// | `mr`, `mr<iterations>` | the older random-rollout MCTS, default 100 iterations |
 /// | `h` | human (TUI only) |
 /// | `e`, `e<depth>` | expectiminimax over its own turn, default depth 3 |
 /// | `l`, `l<depth>` | the same search scored by the learned value function |
@@ -86,6 +96,35 @@ pub enum PlayerCode {
 /// Custom parser function enforcing case-insensitivity
 pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
     let lower = s.to_ascii_lowercase();
+
+    // 'mr' is the older random-rollout MCTS, so it has to be checked before the bare 'm'.
+    if let Some(rest) = lower.strip_prefix("mr") {
+        if rest.is_empty() {
+            return Ok(PlayerCode::MR {
+                iterations: mcts_player::DEFAULT_ITERATIONS,
+            });
+        }
+        if let Ok(iterations) = rest.parse::<u64>() {
+            return Ok(PlayerCode::MR { iterations });
+        }
+        return Err(format!(
+            "Invalid player code: {s}. Use 'mr<iterations>' for random-rollout MCTS, e.g. 'mr100'"
+        ));
+    }
+
+    if let Some(rest) = lower.strip_prefix('m') {
+        if rest.is_empty() {
+            return Ok(PlayerCode::M {
+                iterations: mcts_informed_player::DEFAULT_ITERATIONS,
+            });
+        }
+        if let Ok(iterations) = rest.parse::<u64>() {
+            return Ok(PlayerCode::M { iterations });
+        }
+        return Err(format!(
+            "Invalid player code: {s}. Use 'm<iterations>' for informed MCTS, e.g. 'm200', 'm500'"
+        ));
+    }
 
     // The opponent-aware family: "o", "o<depth>", "ok<K>", "o<depth>k<K>".
     if let Some(rest) = lower.strip_prefix('o') {
@@ -131,7 +170,6 @@ pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
         "r" => Ok(PlayerCode::R),
         "h" => Ok(PlayerCode::H),
         "w" => Ok(PlayerCode::W),
-        "m" => Ok(PlayerCode::M),
         "v" => Ok(PlayerCode::V),
         "e" => Ok(PlayerCode::E { max_depth: 3 }), // Default depth
         "er" => Ok(PlayerCode::ER),
@@ -193,7 +231,8 @@ fn get_player(deck: Deck, player: &PlayerCode) -> Box<dyn Player> {
         PlayerCode::R => Box::new(RandomPlayer { deck }),
         PlayerCode::H => Box::new(HumanPlayer { deck }),
         PlayerCode::W => Box::new(WeightedRandomPlayer { deck }),
-        PlayerCode::M => Box::new(MctsPlayer::new(deck, 100)),
+        PlayerCode::M { iterations } => Box::new(MctsInformedPlayer::new(deck, *iterations)),
+        PlayerCode::MR { iterations } => Box::new(MctsPlayer::new(deck, *iterations)),
         PlayerCode::V => Box::new(ValueFunctionPlayer { deck }),
         PlayerCode::E { max_depth } => Box::new(ExpectiMiniMaxPlayer {
             deck,
@@ -270,7 +309,12 @@ mod tests {
         assert_eq!(parse_player_code("e2"), Ok(PlayerCode::E { max_depth: 2 }));
         assert_eq!(parse_player_code("er"), Ok(PlayerCode::ER));
         assert_eq!(parse_player_code("v"), Ok(PlayerCode::V));
-        assert_eq!(parse_player_code("m"), Ok(PlayerCode::M));
+        assert_eq!(
+            parse_player_code("m"),
+            Ok(PlayerCode::M {
+                iterations: mcts_informed_player::DEFAULT_ITERATIONS
+            })
+        );
         assert_eq!(parse_player_code("r"), Ok(PlayerCode::R));
         assert_eq!(parse_player_code("l"), Ok(PlayerCode::L { max_depth: 3 }));
         assert_eq!(parse_player_code("l2"), Ok(PlayerCode::L { max_depth: 2 }));
