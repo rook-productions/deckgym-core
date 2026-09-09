@@ -471,7 +471,7 @@ mod tests {
     #[test]
     fn test_determinize_keeps_public_information() {
         let (deck_a, deck_b) = load_test_decks();
-        let mut state = State::initialize(&deck_a, &deck_b, &mut rand::thread_rng());
+        let mut state = State::initialize(&deck_a, &deck_b, &mut StdRng::seed_from_u64(41));
         state.turn_count = 5;
 
         let before_hand_size = state.hands[1].len();
@@ -499,7 +499,7 @@ mod tests {
     #[test]
     fn test_determinize_leaves_setup_hands_alone() {
         let (deck_a, deck_b) = load_test_decks();
-        let mut state = State::initialize(&deck_a, &deck_b, &mut rand::thread_rng());
+        let mut state = State::initialize(&deck_a, &deck_b, &mut StdRng::seed_from_u64(41));
         assert_eq!(state.turn_count, 0);
 
         let before = state.hands[1].clone();
