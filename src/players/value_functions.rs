@@ -336,7 +336,9 @@ fn calculate_active_pokemon_online_score(state: &State, player: usize) -> f64 {
         return 0.0;
     };
 
-    // Get all cards available in deck + hand
+    // Get all cards available in deck + hand. For the opponent this reads their hand and deck
+    // only as a UNION, which is public under the known-decklist assumption (deck list minus
+    // cards in play and discard); the hand/deck split is never used.
     let mut available_cards: Vec<Card> = state.decks[player].cards.to_vec();
     available_cards.extend(state.hands[player].iter().cloned());
 
@@ -836,6 +838,8 @@ fn active_online_score(state: &State, player: usize) -> f64 {
     let Some(active) = state.maybe_get_active(player) else {
         return 0.0;
     };
+    // Deck plus hand as a union only; public under the known-decklist assumption (see
+    // calculate_active_pokemon_online_score).
     let mut available: Vec<Card> = state.decks[player].cards.to_vec();
     available.extend(state.hands[player].iter().cloned());
 

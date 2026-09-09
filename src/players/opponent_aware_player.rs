@@ -13,8 +13,11 @@
 //!   1. duplicate own-turn actions are pruned before the search starts,
 //!   2. identical end-of-turn positions are memoised for the duration of one decision,
 //!   3. a node budget counts every action applied inside a reply rollout, and once it is spent the
-//!      remaining leaves are scored with the plain value function, which degrades this player back
-//!      into `ExpectiMiniMaxPlayer` rather than blowing the turn clock. That fallback is logged.
+//!      remaining leaves are scored with the plain value function rather than blowing the turn
+//!      clock. Leaves scored before exhaustion keep their opponent-aware value, so a decision that
+//!      exhausts the budget mid-search mixes the two scorers and the plain-scored leaves (no reply
+//!      subtracted) look systematically rosier; only a budget spent before the first leaf turns
+//!      the decision into a plain `ExpectiMiniMaxPlayer` one. That fallback is logged.
 
 use log::{debug, trace, warn};
 use rand::rngs::StdRng;
@@ -236,7 +239,9 @@ impl Debug for OpponentAwarePlayer {
 /// opponent's hidden hand, of the position left once the opponent has taken their reply turn.
 ///
 /// Falls through to the plain value function when there is no reply to search (the game is over,
-/// or the search stopped inside our own turn) and when the node budget has run out.
+/// or the search stopped inside our own turn) and when the node budget has run out. The latter
+/// mixes plain-scored leaves (more optimistic, no reply subtracted) with opponent-aware ones
+/// inside the same decision; see the module doc.
 #[allow(clippy::too_many_arguments)]
 fn opponent_reply_value(
     leaf: &State,
