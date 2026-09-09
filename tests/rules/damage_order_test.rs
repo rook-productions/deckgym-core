@@ -31,7 +31,7 @@ use deckgym::{
 /// Board setup shared by the FAQ-example tests: Hitmontop's Spinning Attack ([F][F], 50 damage,
 /// no effect text) against a Snorlax that is weak to [F] and wears Heavy Helmet ("If the Pokémon
 /// this card is attached to has a Retreat Cost of 3 or more, it takes -20 damage from attacks
-/// from your opponent's Pokémon" — Snorlax's Retreat Cost is 4). That is exactly the FAQ's
+/// from your opponent's Pokémon", and Snorlax's Retreat Cost is 4). That is exactly the FAQ's
 /// "50-damage attack" against "an effect stating 'This Pokémon takes –20 damage from attacks'".
 fn hitmontop_vs_snorlax_with_heavy_helmet() -> Game<'static> {
     get_test_game_with_board(
@@ -103,7 +103,7 @@ fn test_flat_weakness_with_a_defender_reduction_is_unchanged_by_the_order() {
 /// to [R] and carries −30 of defender-side reductions (Heavy Helmet −20 for its Retreat Cost of
 /// 3, plus Steel Apron −10 for being a [M] Pokémon): `10 + 20 − 30 = 0`.
 ///
-/// The old order clamped before adding Weakness — `max(0, 10 − 30) + 20 = 20` — which invented
+/// The old order clamped before adding Weakness, `max(0, 10 - 30) + 20 = 20`, which invented
 /// 20 damage out of a reduction that should have swallowed the attack whole.
 #[test]
 fn test_defender_reduction_is_not_floored_at_zero_before_weakness_is_added() {

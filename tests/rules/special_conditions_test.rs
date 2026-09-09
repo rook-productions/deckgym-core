@@ -22,8 +22,8 @@ use deckgym::{
     Game, State,
 };
 
-/// Player 0: Squirtle (1 [W] Retreat Cost) holding two [W] Energy — enough to pay for both its
-/// Water Gun attack and a retreat — with a Bulbasaur on the Bench to retreat into.
+/// Player 0: Squirtle (1 [W] Retreat Cost) holding two [W] Energy, enough to pay for both its
+/// Water Gun attack and a retreat, with a Bulbasaur on the Bench to retreat into.
 /// Player 1: a lone Bulbasaur.
 fn game_with_squirtle_able_to_attack_and_retreat() -> Game<'static> {
     get_test_game_with_board(
@@ -122,7 +122,7 @@ fn test_confused_pokemon_may_still_attack_and_retreat() {
 // ---------------------------------------------------------------------------------------------
 
 /// The ordinary case: player 0 paralyzes player 1's Active on player 0's turn. The Checkup that
-/// ends player 0's turn must NOT clear it — otherwise Paralysis never denies an attack at all.
+/// ends player 0's turn must NOT clear it; otherwise Paralysis never denies an attack at all.
 /// It denies player 1's whole next turn and is cleared by the Checkup that ends that turn.
 #[test]
 fn test_paralysis_denies_the_owners_next_turn_and_clears_after_it() {
@@ -142,7 +142,7 @@ fn test_paralysis_denies_the_owners_next_turn_and_clears_after_it() {
     assert_eq!(state.current_player, 1, "it should now be player 1's turn");
     assert!(
         state.get_active(1).is_paralyzed(),
-        "the Checkup ending the *inflicting* player's turn must not clear Paralysis — in-app \
+        "the Checkup ending the *inflicting* player's turn must not clear Paralysis; in-app \
          Tips: it recovers only \"after its owner's next turn\""
     );
 
@@ -312,7 +312,7 @@ fn test_confusion_tails_cancels_the_attack_without_self_damage_and_ends_the_turn
             saw_tails = true;
             assert_eq!(
                 own_hp, 60,
-                "in-app Tips: on tails \"the attack doesn't happen\" — Pocket's Confusion deals \
+                "in-app Tips: on tails \"the attack doesn't happen\"; Pocket's Confusion deals \
                  no self-damage (seed {seed})"
             );
         } else {

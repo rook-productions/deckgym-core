@@ -62,7 +62,7 @@ fn test_reaching_three_points_together_with_an_empty_board_is_a_loss_not_a_tie()
         state.winner,
         Some(GameOutcome::Win(0)),
         "in-app Tips: \"If a player doesn't have any Pokémon remaining in play, that player \
-         loses the battle regardless of the number of points each player has\" — reaching 3 on \
+         loses the battle regardless of the number of points each player has\"; reaching 3 on \
          the same action does not rescue an empty board into a tie"
     );
 }

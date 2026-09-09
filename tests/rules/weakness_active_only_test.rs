@@ -60,7 +60,7 @@ fn test_weakness_applies_to_active_but_not_to_benched_pokemon() {
     assert_eq!(
         damage_on(&state, 1, 1, SPIRITOMB_HP),
         20,
-        "in-app Tips: \"Don't apply Weakness for Benched Pokémon\" — the Benched Spiritomb \
+        "in-app Tips: \"Don't apply Weakness for Benched Pokémon\"; the Benched Spiritomb \
          takes the attack's plain 20"
     );
 }

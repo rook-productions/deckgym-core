@@ -76,7 +76,7 @@ fn test_both_players_conditions_resolve_in_a_single_checkup() {
 }
 
 /// "Any Pokémon that has no HP remaining at the end of Pokémon Checkup is Knocked Out." Both
-/// sides' Knock Outs are therefore resolved together, and each player scores their point — a
+/// sides' Knock Outs are therefore resolved together, and each player scores their point, a
 /// Checkup KO on one side does not short-circuit the other.
 #[test]
 fn test_simultaneous_checkup_knockouts_both_score() {
@@ -105,7 +105,7 @@ fn test_simultaneous_checkup_knockouts_both_score() {
     );
 }
 
-/// Burn's recovery coin is flipped for the Pokémon that is Burned, after its Burn damage — the
+/// Burn's recovery coin is flipped for the Pokémon that is Burned, after its Burn damage; the
 /// damage lands whether or not the flip comes up heads.
 #[test]
 fn test_burn_damage_lands_before_its_recovery_flip() {
