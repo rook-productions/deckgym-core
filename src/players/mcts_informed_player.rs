@@ -399,14 +399,13 @@ impl Debug for MctsInformedPlayer {
 /// not plan around draws it cannot actually see. Public information (both boards, both discard
 /// piles, hand *sizes*, the deck lists) is untouched.
 ///
-/// Skipped on turn 0, where the setup rules require each opening hand to contain a Basic and a
-/// re-deal could produce a hand with no legal placement.
+/// On turn 0 the setup rules guarantee every opening hand holds a Basic, so the re-deal is
+/// rejection-sampled until the sampled hand does too (a hand with no Basic could not exist and
+/// would leave the opponent no legal placement). If `SETUP_REDEAL_ATTEMPTS` shuffles all fail,
+/// which cannot happen for a legal deck, the true hand is kept and the fact is logged.
 fn determinize(state: &mut State, myself: usize, rng: &mut StdRng) {
     state.decks[myself].cards.shuffle(rng);
 
-    if state.turn_count == 0 {
-        return;
-    }
     let opponent = (myself + 1) % 2;
     let hand_size = state.hands[opponent].len();
     if hand_size == 0 {
@@ -416,11 +415,24 @@ fn determinize(state: &mut State, myself: usize, rng: &mut StdRng) {
     let mut pool: Vec<Card> = Vec::with_capacity(hand_size + state.decks[opponent].cards.len());
     pool.extend(state.hands[opponent].iter().cloned());
     pool.extend(state.decks[opponent].cards.iter().cloned());
-    pool.shuffle(rng);
 
-    state.decks[opponent].cards = pool.split_off(hand_size);
-    state.hands[opponent] = pool;
+    let needs_basic = state.turn_count == 0;
+    for _ in 0..SETUP_REDEAL_ATTEMPTS {
+        pool.shuffle(rng);
+        if !needs_basic || pool[..hand_size].iter().any(|c| c.is_basic()) {
+            state.decks[opponent].cards = pool.split_off(hand_size);
+            state.hands[opponent] = pool;
+            return;
+        }
+    }
+    log::warn!(
+        "determinize: no opening hand with a Basic in {} shuffles; keeping the true hand",
+        SETUP_REDEAL_ATTEMPTS
+    );
 }
+
+/// Shuffles tried on turn 0 before falling back to the true opening hand.
+const SETUP_REDEAL_ATTEMPTS: usize = 32;
 
 /// How many children a node with `visits` visits is allowed. Decisions with few actions are
 /// enumerated in full; only wide ones (a hand full of playable Trainers, an Attach with many
@@ -496,14 +508,44 @@ mod tests {
         assert_eq!(pool_before, pool_after);
     }
 
+    /// On turn 0 the opponent's hand is re-dealt like any other, so the search never sees the real
+    /// opening hand, but every sampled hand must still hold a Basic (the setup rule) so the
+    /// opponent keeps a legal placement.
     #[test]
-    fn test_determinize_leaves_setup_hands_alone() {
+    fn test_determinize_redeals_setup_hands_with_a_basic() {
         let (deck_a, deck_b) = load_test_decks();
         let mut state = State::initialize(&deck_a, &deck_b, &mut StdRng::seed_from_u64(41));
         assert_eq!(state.turn_count, 0);
 
         let before = state.hands[1].clone();
+        let mut pool_before: Vec<String> = before
+            .iter()
+            .chain(state.decks[1].cards.iter())
+            .map(|card| card.get_name())
+            .collect();
+        pool_before.sort();
+
+        let mut changed = false;
+        for seed in 0..20u64 {
+            let mut sample = state.clone();
+            determinize(&mut sample, 0, &mut StdRng::seed_from_u64(seed));
+            assert_eq!(sample.hands[1].len(), before.len());
+            assert!(sample.hands[1].iter().any(|c| c.is_basic()));
+            let mut pool_after: Vec<String> = sample.hands[1]
+                .iter()
+                .chain(sample.decks[1].cards.iter())
+                .map(|card| card.get_name())
+                .collect();
+            pool_after.sort();
+            assert_eq!(pool_before, pool_after);
+            if sample.hands[1] != before {
+                changed = true;
+            }
+        }
+        assert!(
+            changed,
+            "20 re-deals never moved the opening hand: the true hand is leaking"
+        );
         determinize(&mut state, 0, &mut StdRng::seed_from_u64(7));
-        assert_eq!(state.hands[1], before);
     }
 }
