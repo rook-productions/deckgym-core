@@ -3,6 +3,7 @@ mod end_turn_player;
 mod evolution_rusher_player;
 mod expectiminimax_player;
 mod human_player;
+mod mcts_informed_player;
 mod mcts_player;
 mod random_player;
 mod value_function_player;
@@ -14,6 +15,7 @@ pub use end_turn_player::EndTurnPlayer;
 pub use evolution_rusher_player::EvolutionRusherPlayer;
 pub use expectiminimax_player::{ExpectiMiniMaxPlayer, ValueFunction};
 pub use human_player::HumanPlayer;
+pub use mcts_informed_player::MctsInformedPlayer;
 pub use mcts_player::MctsPlayer;
 pub use random_player::RandomPlayer;
 pub use value_function_player::ValueFunctionPlayer;
@@ -42,14 +44,52 @@ pub enum PlayerCode {
     R,
     H,
     W,
-    M,
+    /// Value-guided information-set MCTS (`m`, `m500`).
+    M {
+        iterations: u64,
+    },
+    /// The older random-rollout MCTS, kept for comparison (`mr`, `mr500`).
+    MR {
+        iterations: u64,
+    },
     V,
-    E { max_depth: usize },
+    E {
+        max_depth: usize,
+    },
     ER, // Evolution Rusher
 }
 /// Custom parser function enforcing case-insensitivity
 pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
     let lower = s.to_ascii_lowercase();
+
+    // 'mr' is the older random-rollout MCTS, so it has to be checked before the bare 'm'.
+    if let Some(rest) = lower.strip_prefix("mr") {
+        if rest.is_empty() {
+            return Ok(PlayerCode::MR {
+                iterations: mcts_player::DEFAULT_ITERATIONS,
+            });
+        }
+        if let Ok(iterations) = rest.parse::<u64>() {
+            return Ok(PlayerCode::MR { iterations });
+        }
+        return Err(format!(
+            "Invalid player code: {s}. Use 'mr<iterations>' for random-rollout MCTS, e.g. 'mr100'"
+        ));
+    }
+
+    if let Some(rest) = lower.strip_prefix('m') {
+        if rest.is_empty() {
+            return Ok(PlayerCode::M {
+                iterations: mcts_informed_player::DEFAULT_ITERATIONS,
+            });
+        }
+        if let Ok(iterations) = rest.parse::<u64>() {
+            return Ok(PlayerCode::M { iterations });
+        }
+        return Err(format!(
+            "Invalid player code: {s}. Use 'm<iterations>' for informed MCTS, e.g. 'm200', 'm500'"
+        ));
+    }
 
     // Check if it starts with 'e' followed by digits (e.g., e2, e4)
     if lower.starts_with('e') && lower.len() > 1 {
@@ -70,7 +110,6 @@ pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
         "r" => Ok(PlayerCode::R),
         "h" => Ok(PlayerCode::H),
         "w" => Ok(PlayerCode::W),
-        "m" => Ok(PlayerCode::M),
         "v" => Ok(PlayerCode::V),
         "e" => Ok(PlayerCode::E { max_depth: 3 }), // Default depth
         "er" => Ok(PlayerCode::ER),
@@ -113,7 +152,8 @@ fn get_player(deck: Deck, player: &PlayerCode) -> Box<dyn Player> {
         PlayerCode::R => Box::new(RandomPlayer { deck }),
         PlayerCode::H => Box::new(HumanPlayer { deck }),
         PlayerCode::W => Box::new(WeightedRandomPlayer { deck }),
-        PlayerCode::M => Box::new(MctsPlayer::new(deck, 100)),
+        PlayerCode::M { iterations } => Box::new(MctsInformedPlayer::new(deck, *iterations)),
+        PlayerCode::MR { iterations } => Box::new(MctsPlayer::new(deck, *iterations)),
         PlayerCode::V => Box::new(ValueFunctionPlayer { deck }),
         PlayerCode::E { max_depth } => Box::new(ExpectiMiniMaxPlayer {
             deck,
