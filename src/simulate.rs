@@ -261,8 +261,14 @@ impl Simulation {
     }
 }
 
-/// Registers DataExporter with the given output folder
-fn register_data_exporter(simulation: Simulation, output_folder: String) -> Simulation {
+/// Registers DataExporter with the given output folder. The two deck paths are recorded so that
+/// every game's `result.json` says which decks it was between.
+fn register_data_exporter(
+    simulation: Simulation,
+    output_folder: String,
+    deck_a_path: &str,
+    deck_b_path: &str,
+) -> Simulation {
     let output_path = PathBuf::from(output_folder);
 
     // Create the output folder if it doesn't exist
@@ -275,7 +281,11 @@ fn register_data_exporter(simulation: Simulation, output_folder: String) -> Simu
 
     warn!("Exporting simulation data to: {:?}", output_path);
 
-    simulation.register_with_closure(move || Box::new(DataExporter::new(output_path.clone())))
+    let deck_a = deck_a_path.to_string();
+    let deck_b = deck_b_path.to_string();
+    simulation.register_with_closure(move || {
+        Box::new(DataExporter::new(output_path.clone()).with_decks(deck_a.clone(), deck_b.clone()))
+    })
 }
 
 /// Functional API for running simulations
@@ -319,7 +329,7 @@ pub fn simulate(
 
     simulation = simulation.register::<StatsCollector>();
     if let Some(output_folder) = sim_config.data_output {
-        simulation = register_data_exporter(simulation, output_folder);
+        simulation = register_data_exporter(simulation, output_folder, deck_a_path, deck_b_path);
     }
 
     let pb_clone = pb.clone();
