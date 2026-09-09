@@ -14,17 +14,68 @@ use super::Player;
 // Using Box<dyn Fn> to allow closures with captured variables
 pub type ValueFunction = Box<dyn Fn(&State, usize) -> f64>;
 
-struct DebugStateNode {
+/// A borrowed value function. The owned `ValueFunction` above is `Box<dyn Fn + 'static>`, so a
+/// closure that borrows local data cannot be stored in one. The search takes this borrowed form
+/// instead, which lets `OpponentAwarePlayer` pass a leaf evaluator that borrows its own state
+/// (rng, node counter, memo table) while still reusing the same search machinery.
+pub(crate) type ValueFnRef<'a> = &'a dyn Fn(&State, usize) -> f64;
+
+pub(crate) struct DebugStateNode {
     acting_player: usize,
     children: Vec<DebugActionNode>,
     proba: f64,
     value: f64,
 }
 
-struct DebugActionNode {
+pub(crate) struct DebugActionNode {
     action: Action,
     children: Vec<DebugStateNode>,
     value: f64,
+}
+
+/// Scores every action in `possible_actions` with the expectiminimax search, returning one score
+/// per action plus the debug tree node for each. Shared by `ExpectiMiniMaxPlayer` and
+/// `OpponentAwarePlayer`, which differ only in the leaf evaluator they hand in.
+///
+/// `max_depth` counts plies from the root, so `max_depth == 1` is a plain one-ply greedy lookahead.
+pub(crate) fn search_actions(
+    rng: &mut StdRng,
+    state: &State,
+    possible_actions: &[Action],
+    max_depth: usize,
+    myself: usize,
+    value_function: ValueFnRef,
+) -> (Vec<f64>, Vec<DebugActionNode>) {
+    // Temporarily silence debug and trace logs, which the search would otherwise flood.
+    let original_level = log::max_level();
+    log::set_max_level(LevelFilter::Info);
+    let mut scores: Vec<f64> = Vec::with_capacity(possible_actions.len());
+    let mut nodes: Vec<DebugActionNode> = Vec::with_capacity(possible_actions.len());
+    for action in possible_actions.iter() {
+        let (score, action_node) = expected_value_function(
+            rng,
+            state,
+            action,
+            max_depth.saturating_sub(1),
+            myself,
+            value_function,
+        );
+        scores.push(score);
+        nodes.push(action_node);
+    }
+    log::set_max_level(original_level); // Restore the original logging level
+    (scores, nodes)
+}
+
+/// Index and value of the highest score. Panics on an empty slice, which cannot happen because
+/// the engine never asks a player to choose from zero actions.
+pub(crate) fn argmax_score(scores: &[f64]) -> (usize, f64) {
+    scores
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+        .map(|(idx, score)| (idx, *score))
+        .expect("at least one action to score")
 }
 
 pub struct ExpectiMiniMaxPlayer {
@@ -52,31 +103,19 @@ impl Player for ExpectiMiniMaxPlayer {
         };
 
         // Get value for each possible action
-        let original_level = log::max_level();
-        log::set_max_level(LevelFilter::Info); // Temporarily silence debug and trace logs
-        let mut scores: Vec<f64> = Vec::with_capacity(possible_actions.len());
-        for action in possible_actions.iter() {
-            let (score, action_node) = expected_value_function(
-                rng,
-                state,
-                action,
-                self.max_depth - 1,
-                myself,
-                &self.value_function,
-            );
-            scores.push(score);
-            root.children.push(action_node);
-        }
-        log::set_max_level(original_level); // Restore the original logging level
+        let (scores, nodes) = search_actions(
+            rng,
+            state,
+            possible_actions,
+            self.max_depth,
+            myself,
+            &*self.value_function,
+        );
+        root.children = nodes;
 
         trace!("Scores: {scores:?}");
         // Select the one with best score
-        let (best_idx, best_score) = scores
-            .iter()
-            .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .map(|(idx, score)| (idx, *score))
-            .unwrap();
+        let (best_idx, best_score) = argmax_score(&scores);
         root.value = best_score;
 
         // Output Tree in Dot format for visualization if enabled
@@ -108,13 +147,13 @@ impl Player for ExpectiMiniMaxPlayer {
     }
 }
 
-fn expected_value_function(
+pub(crate) fn expected_value_function(
     rng: &mut StdRng,
     state: &State,
     action: &Action,
     depth: usize,
     myself: usize,
-    value_function: &ValueFunction,
+    value_function: ValueFnRef,
 ) -> (f64, DebugActionNode) {
     let indent = "\t".repeat(10 - depth.min(10));
     trace!("{indent}E({myself}) depth left: {depth} action: {action:?}");
@@ -157,7 +196,7 @@ fn expectiminimax(
     state: &State,
     depth: usize,
     myself: usize,
-    value_function: &ValueFunction,
+    value_function: ValueFnRef,
 ) -> (f64, DebugStateNode) {
     if state.is_game_over() || depth == 0 || state.current_player != myself {
         let score = value_function(state, myself);
