@@ -48,9 +48,10 @@ pub enum PlayerCode {
     R,
     H,
     W,
-    /// Value-guided information-set MCTS (`m`, `m500`).
+    /// Value-guided information-set MCTS (`m`, `m500`, `mL`, `m500L`).
     M {
         iterations: u64,
+        value_function: ValueFunctionKind,
     },
     /// The older random-rollout MCTS, kept for comparison (`mr`, `mr500`).
     MR {
@@ -71,6 +72,7 @@ pub enum PlayerCode {
     O {
         max_depth: usize,
         samples: usize,
+        value_function: ValueFunctionKind,
     },
 }
 
@@ -91,8 +93,15 @@ pub enum PlayerCode {
 /// | `l`, `l<depth>` | the same search scored by the learned value function |
 /// | `o`, `o<depth>`, `ok<K>`, `o<depth>k<K>` | opponent-aware search, default depth 3 and K 3 |
 ///
-/// The `o` family is the only one that looks past the end of its own turn. `o` is `o3k3`; `o2` is
-/// the cheap depth, `ok5` raises the number of sampled opponent hands, and `o2k5` sets both.
+/// The `o` and `m` families are the ones that look past the end of their own turn. `o` is `o3k3`;
+/// `o2` is the cheap depth, `ok5` raises the number of sampled opponent hands, and `o2k5` sets
+/// both.
+///
+/// Both of them own a value function, and a trailing `L` swaps the baseline scorer for the learned
+/// one of player code `l`: `oL`, `o2L`, `o2k5L`, `mL`, `m500L`. Without the suffix they keep the
+/// hand-tuned baseline, so `o` and `oL` (and `m` and `mL`) are the same search under two different
+/// scorers. `mr` takes no suffix: the random-rollout MCTS plays positions out to the end and never
+/// scores one.
 /// Custom parser function enforcing case-insensitivity
 pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
     let lower = s.to_ascii_lowercase();
@@ -108,26 +117,35 @@ pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
             return Ok(PlayerCode::MR { iterations });
         }
         return Err(format!(
-            "Invalid player code: {s}. Use 'mr<iterations>' for random-rollout MCTS, e.g. 'mr100'"
+            "Invalid player code: {s}. Use 'mr<iterations>' for random-rollout MCTS, e.g. 'mr100'. \
+             It plays positions out to the end, so it takes no 'l' value-function suffix"
         ));
     }
 
     if let Some(rest) = lower.strip_prefix('m') {
+        let (rest, value_function) = split_value_function_suffix(rest);
         if rest.is_empty() {
             return Ok(PlayerCode::M {
                 iterations: mcts_informed_player::DEFAULT_ITERATIONS,
+                value_function,
             });
         }
         if let Ok(iterations) = rest.parse::<u64>() {
-            return Ok(PlayerCode::M { iterations });
+            return Ok(PlayerCode::M {
+                iterations,
+                value_function,
+            });
         }
         return Err(format!(
-            "Invalid player code: {s}. Use 'm<iterations>' for informed MCTS, e.g. 'm200', 'm500'"
+            "Invalid player code: {s}. Use 'm<iterations>' for informed MCTS, e.g. 'm200', 'm500', \
+             and a trailing 'l' for the learned value function, e.g. 'ml', 'm500l'"
         ));
     }
 
-    // The opponent-aware family: "o", "o<depth>", "ok<K>", "o<depth>k<K>".
+    // The opponent-aware family: "o", "o<depth>", "ok<K>", "o<depth>k<K>", each with an optional
+    // trailing "l" for the learned value function.
     if let Some(rest) = lower.strip_prefix('o') {
+        let (rest, value_function) = split_value_function_suffix(rest);
         let (depth_part, samples_part) = match rest.split_once('k') {
             Some((depth, samples)) => (depth, Some(samples)),
             None => (rest, None),
@@ -139,7 +157,11 @@ pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
             None => Some(opponent_aware_player::DEFAULT_SAMPLES),
         }
         .ok_or_else(|| invalid_o_code(s))?;
-        return Ok(PlayerCode::O { max_depth, samples });
+        return Ok(PlayerCode::O {
+            max_depth,
+            samples,
+            value_function,
+        });
     }
 
     // Check if it starts with 'e' followed by digits (e.g., e2, e4)
@@ -178,6 +200,18 @@ pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
     }
 }
 
+/// Splits a trailing `l` off the tail of a player code and reports which scorer it names.
+///
+/// The codes that own a value function (`o` and `m`) are otherwise digits and the letter `k`, so a
+/// trailing `l` is unambiguous. `o2k5l` is `o2k5` with the learned function; anything without the
+/// suffix keeps the hand-tuned baseline.
+fn split_value_function_suffix(rest: &str) -> (&str, ValueFunctionKind) {
+    match rest.strip_suffix('l') {
+        Some(head) => (head, ValueFunctionKind::Learned),
+        None => (rest, ValueFunctionKind::Baseline),
+    }
+}
+
 /// Parses `text` as a positive integer, or returns `default` when it is empty. `None` means the
 /// text was present but not a usable count.
 fn parse_positive(text: &str, default: usize) -> Option<usize> {
@@ -190,7 +224,8 @@ fn parse_positive(text: &str, default: usize) -> Option<usize> {
 fn invalid_o_code(s: &str) -> String {
     format!(
         "Invalid player code: {s}. Use 'o' for the opponent-aware search at depth {} with K={}, \
-         or 'o<depth>', 'ok<K>', 'o<depth>k<K>', e.g. 'o2', 'ok5', 'o2k5'",
+         or 'o<depth>', 'ok<K>', 'o<depth>k<K>', e.g. 'o2', 'ok5', 'o2k5', each with an optional \
+         trailing 'l' for the learned value function, e.g. 'ol', 'o2k5l'",
         opponent_aware_player::DEFAULT_DEPTH,
         opponent_aware_player::DEFAULT_SAMPLES
     )
@@ -231,7 +266,14 @@ fn get_player(deck: Deck, player: &PlayerCode) -> Box<dyn Player> {
         PlayerCode::R => Box::new(RandomPlayer { deck }),
         PlayerCode::H => Box::new(HumanPlayer { deck }),
         PlayerCode::W => Box::new(WeightedRandomPlayer { deck }),
-        PlayerCode::M { iterations } => Box::new(MctsInformedPlayer::new(deck, *iterations)),
+        PlayerCode::M {
+            iterations,
+            value_function,
+        } => Box::new(MctsInformedPlayer::with_value_function(
+            deck,
+            *iterations,
+            value_functions::build_value_function(*value_function),
+        )),
         PlayerCode::MR { iterations } => Box::new(MctsPlayer::new(deck, *iterations)),
         PlayerCode::V => Box::new(ValueFunctionPlayer { deck }),
         PlayerCode::E { max_depth } => Box::new(ExpectiMiniMaxPlayer {
@@ -251,9 +293,16 @@ fn get_player(deck: Deck, player: &PlayerCode) -> Box<dyn Player> {
                 value_functions::ValueFunctionKind::Learned,
             ),
         }),
-        PlayerCode::O { max_depth, samples } => {
-            Box::new(OpponentAwarePlayer::new(deck, *max_depth, *samples))
-        }
+        PlayerCode::O {
+            max_depth,
+            samples,
+            value_function,
+        } => Box::new(OpponentAwarePlayer::with_value_function(
+            deck,
+            *max_depth,
+            *samples,
+            value_functions::build_value_function(*value_function),
+        )),
     }
 }
 
@@ -267,6 +316,7 @@ mod tests {
         let defaults = PlayerCode::O {
             max_depth: DEFAULT_DEPTH,
             samples: DEFAULT_SAMPLES,
+            value_function: ValueFunctionKind::Baseline,
         };
         assert_eq!(parse_player_code("o"), Ok(defaults.clone()));
         assert_eq!(parse_player_code("O"), Ok(defaults));
@@ -274,21 +324,24 @@ mod tests {
             parse_player_code("o2"),
             Ok(PlayerCode::O {
                 max_depth: 2,
-                samples: DEFAULT_SAMPLES
+                samples: DEFAULT_SAMPLES,
+                value_function: ValueFunctionKind::Baseline
             })
         );
         assert_eq!(
             parse_player_code("ok5"),
             Ok(PlayerCode::O {
                 max_depth: DEFAULT_DEPTH,
-                samples: 5
+                samples: 5,
+                value_function: ValueFunctionKind::Baseline
             })
         );
         assert_eq!(
             parse_player_code("o2k5"),
             Ok(PlayerCode::O {
                 max_depth: 2,
-                samples: 5
+                samples: 5,
+                value_function: ValueFunctionKind::Baseline
             })
         );
     }
@@ -303,6 +356,48 @@ mod tests {
         }
     }
 
+    /// A trailing `l` on the two codes that own a value function swaps the baseline scorer for the
+    /// learned one, and leaves the rest of the code alone.
+    #[test]
+    fn test_parse_learned_value_function_suffix() {
+        assert_eq!(
+            parse_player_code("oL"),
+            Ok(PlayerCode::O {
+                max_depth: DEFAULT_DEPTH,
+                samples: DEFAULT_SAMPLES,
+                value_function: ValueFunctionKind::Learned
+            })
+        );
+        assert_eq!(
+            parse_player_code("o2k5l"),
+            Ok(PlayerCode::O {
+                max_depth: 2,
+                samples: 5,
+                value_function: ValueFunctionKind::Learned
+            })
+        );
+        assert_eq!(
+            parse_player_code("mL"),
+            Ok(PlayerCode::M {
+                iterations: mcts_informed_player::DEFAULT_ITERATIONS,
+                value_function: ValueFunctionKind::Learned
+            })
+        );
+        assert_eq!(
+            parse_player_code("m500l"),
+            Ok(PlayerCode::M {
+                iterations: 500,
+                value_function: ValueFunctionKind::Learned
+            })
+        );
+        // `mr` plays positions out to the end, so it has no scorer to swap.
+        assert!(parse_player_code("mrl").is_err());
+        assert!(parse_player_code("mr100l").is_err());
+        // The suffix does not rescue an otherwise malformed code.
+        assert!(parse_player_code("o0l").is_err());
+        assert!(parse_player_code("mxl").is_err());
+    }
+
     #[test]
     fn test_parse_leaves_the_other_codes_alone() {
         assert_eq!(parse_player_code("e"), Ok(PlayerCode::E { max_depth: 3 }));
@@ -312,7 +407,8 @@ mod tests {
         assert_eq!(
             parse_player_code("m"),
             Ok(PlayerCode::M {
-                iterations: mcts_informed_player::DEFAULT_ITERATIONS
+                iterations: mcts_informed_player::DEFAULT_ITERATIONS,
+                value_function: ValueFunctionKind::Baseline
             })
         );
         assert_eq!(parse_player_code("r"), Ok(PlayerCode::R));

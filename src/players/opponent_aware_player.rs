@@ -95,6 +95,23 @@ pub struct OpponentAwarePlayer {
 
 impl OpponentAwarePlayer {
     pub fn new(deck: Deck, max_depth: usize, samples: usize) -> Self {
+        Self::with_value_function(
+            deck,
+            max_depth,
+            samples,
+            Box::new(super::value_functions::baseline_value_function),
+        )
+    }
+
+    /// Builds the player with an injected scorer, so the learned value function can be dropped in
+    /// without touching the search. Both the end-of-turn leaves and the opponent's own reply
+    /// policy use it, which is the point: the reply is only as good as the function judging it.
+    pub fn with_value_function(
+        deck: Deck,
+        max_depth: usize,
+        samples: usize,
+        value_function: ValueFunction,
+    ) -> Self {
         Self {
             deck,
             max_depth: max_depth.max(1),
@@ -104,7 +121,7 @@ impl OpponentAwarePlayer {
             },
             node_budget: DEFAULT_NODE_BUDGET,
             reply_step_cap: DEFAULT_REPLY_STEP_CAP,
-            value_function: Box::new(super::value_functions::baseline_value_function),
+            value_function,
             rng: RefCell::new(StdRng::seed_from_u64(0)),
             fallbacks: Cell::new(0),
             decisions: Cell::new(0),

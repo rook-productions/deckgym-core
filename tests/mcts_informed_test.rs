@@ -258,19 +258,37 @@ fn skip(yardstick_elapsed: Duration) {
 
 #[test]
 fn test_player_codes_parse() {
-    use deckgym::players::{parse_player_code, PlayerCode};
+    use deckgym::players::{parse_player_code, PlayerCode, ValueFunctionKind};
 
+    // The value function is part of the code since the bot branches were merged: a bare `m` keeps
+    // the hand-tuned baseline and `mL` asks for the learned one.
     assert_eq!(
         parse_player_code("m"),
-        Ok(PlayerCode::M { iterations: 200 })
+        Ok(PlayerCode::M {
+            iterations: 200,
+            value_function: ValueFunctionKind::Baseline
+        })
     );
     assert_eq!(
         parse_player_code("m500"),
-        Ok(PlayerCode::M { iterations: 500 })
+        Ok(PlayerCode::M {
+            iterations: 500,
+            value_function: ValueFunctionKind::Baseline
+        })
     );
     assert_eq!(
         parse_player_code("M500"),
-        Ok(PlayerCode::M { iterations: 500 })
+        Ok(PlayerCode::M {
+            iterations: 500,
+            value_function: ValueFunctionKind::Baseline
+        })
+    );
+    assert_eq!(
+        parse_player_code("mL"),
+        Ok(PlayerCode::M {
+            iterations: 200,
+            value_function: ValueFunctionKind::Learned
+        })
     );
     // The old random-rollout MCTS keeps its previous default of 100 iterations under `mr`.
     assert_eq!(
