@@ -140,6 +140,37 @@ cargo run optimize example_decks/incomplete-chari.txt A2147,A2148 example_decks/
 cargo run optimize example_decks/incomplete-chari.txt A2147,A2147,A2148,A2148 example_decks/ --num 1000 --players r,r -v --parallel
 ```
 
+**Player Codes**
+
+`--players` takes two comma-separated codes, one per seat.
+
+| Code | Player |
+|---|---|
+| `r` | uniformly random legal action |
+| `w` | weighted random |
+| `aa` | attach energy, then attack |
+| `et` | end the turn immediately |
+| `er` | evolution rusher |
+| `v` | one-ply greedy on the baseline value function |
+| `m` | MCTS, 100 iterations |
+| `h` | human (TUI only) |
+| `e`, `e<depth>` | ExpectiMiniMax over its own turn, default depth 3 |
+| `o`, `o<depth>`, `ok<K>`, `o<depth>k<K>` | opponent-aware search, default depth 3 and K 3 |
+
+`o` is the only code that looks past the end of its own turn. It searches its own actions the way
+`e` does, then, at every end-of-turn position, samples `K` determinisations of the opponent's
+hidden hand (drawn from the cards the opponent has not revealed, never from their real hand), lets
+the opponent take a full reply turn under a fast greedy policy, and averages the value of what is
+left. `o` is `o3k3`; `o2` is a cheaper depth, `ok5` samples more opponent hands, `o2k5` sets both.
+It is expensive. On venusaur-exeggutor against weezing-arbok, 50 games with `--parallel` on a
+16-core M4 Max (shared with other work, so these are upper bounds): `e,e` 0.045 to 0.049 s per game,
+`o2,e` 0.46 to 0.52 s per game, `o,e` 1.05 to 1.31 s per game. That is roughly 21x `e` at depth 3
+and 9x at depth 2. Always pass `--parallel`, and reach for `o2` when the game count matters.
+
+```bash
+cargo run --release -- simulate example_decks/venusaur-exeggutor.txt example_decks/weezing-arbok.txt --num 50 --players o,e --parallel
+```
+
 **Card Search Tool**
 
 The repository includes a search utility that's particularly useful for agentic AI applications, as reading the complete `database.json` file (which contains all card data) often exceeds context limits.
