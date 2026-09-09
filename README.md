@@ -152,23 +152,78 @@ cargo run optimize example_decks/incomplete-chari.txt A2147,A2147,A2148,A2148 ex
 | `et` | end the turn immediately |
 | `er` | evolution rusher |
 | `v` | one-ply greedy on the baseline value function |
-| `m` | MCTS, 100 iterations |
 | `h` | human (TUI only) |
 | `e`, `e<depth>` | ExpectiMiniMax over its own turn, default depth 3 |
+| `l`, `l<depth>` | the same search scored by the learned value function |
 | `o`, `o<depth>`, `ok<K>`, `o<depth>k<K>` | opponent-aware search, default depth 3 and K 3 |
+| `m`, `m<iterations>` | value-guided information-set MCTS, default 200 iterations |
+| `mr`, `mr<iterations>` | the older random-rollout MCTS, default 100 iterations |
 
-`o` is the only code that looks past the end of its own turn. It searches its own actions the way
-`e` does, then, at every end-of-turn position, samples `K` determinisations of the opponent's
-hidden hand (drawn from the cards the opponent has not revealed, never from their real hand), lets
-the opponent take a full reply turn under a fast greedy policy, and averages the value of what is
-left. `o` is `o3k3`; `o2` is a cheaper depth, `ok5` samples more opponent hands, `o2k5` sets both.
-It is expensive. On venusaur-exeggutor against weezing-arbok, 50 games with `--parallel` on a
-16-core M4 Max (shared with other work, so these are upper bounds): `e,e` 0.045 to 0.049 s per game,
-`o2,e` 0.46 to 0.52 s per game, `o,e` 1.05 to 1.31 s per game. That is roughly 21x `e` at depth 3
-and 9x at depth 2. Always pass `--parallel`, and reach for `o2` when the game count matters.
+Codes are case-insensitive. `e`, `l`, `o` and `m` all score positions with a value function, and
+there are two of those: the hand-tuned baseline (points, a won game, whether the Active can attack,
+and how many turns the opponent needs to win) and a learned one, an L2-regularised logistic model
+over 41 board features that predicts whether the acting player eventually wins. `l` is `e` under
+the learned function. For `o` and `m`, which own their scorer too, a trailing `l` selects it: `oL`,
+`o2L`, `o2k5L`, `mL`, `m500L`. Without the suffix they keep the baseline, so `o` against `oL` and
+`m` against `mL` compare the two scorers under one search. `mr` takes no suffix, because a
+random-rollout MCTS plays a position out to the end and never scores one.
+
+`o` and `m` are the codes that look past the end of their own turn. `o` searches its own actions
+the way `e` does, then, at every end-of-turn position, samples `K` determinisations of the
+opponent's hidden hand (drawn from the cards the opponent has not revealed, never from their real
+hand), lets the opponent take a full reply turn under a fast greedy policy, and averages the value
+of what is left. `o` is `o3k3`; `o2` is a cheaper depth, `ok5` samples more opponent hands, `o2k5`
+sets both. `m` re-deals the opponent's unseen cards on every iteration, runs information-set UCB
+over both players' actions for two further turns, and scores the leaf rather than playing it out.
+
+The search bots are expensive. Wall time on venusaur-exeggutor against weezing-arbok, 20 games with
+`--parallel` on a 16-core M4 Max shared with other work, so read these as upper bounds and as
+timings rather than as strength (20 games says nothing about a win rate):
+
+| players | seconds per game |
+|---|---|
+| `e2,e` | 0.04 |
+| `e,e` | 0.05 |
+| `l,e` | 0.07 |
+| `oL,e` | 0.65 |
+| `mr,e` | 0.82 |
+| `o,e` | 1.50 |
+| `mL,e` | 1.88 |
+| `m,e` | 2.39 |
+
+Always pass `--parallel`, and reach for `o2` or a smaller `m<iterations>` when the game count
+matters.
+
+**Comparing bots.** `bot_puzzles` runs the 27 hand-built tactical positions in `src/puzzles/`
+against any list of codes and prints pass or fail per puzzle. Each position is asked five times and
+the majority answer is the verdict, because several bots consume randomness.
+
+```bash
+cargo run --release --bin bot_puzzles -- --players r,v,e2,e,l,o,oL,m,mL,mr
+```
+
+Measured on the same machine, release build, 5 trials per puzzle. A chooser picking uniformly at
+random scores 7.2 of 27 in expectation, so read a score against that floor and not against zero.
+
+| bot | solved | seconds |
+|---|---|---|
+| `r` | 13 | 0.0 |
+| `v` | 16 | 0.0 |
+| `mr` | 16 | 15.2 |
+| `m` | 17 | 20.0 |
+| `mL` | 19 | 15.3 |
+| `e2` | 22 | 0.0 |
+| `e` | 22 | 0.0 |
+| `l` | 23 | 0.0 |
+| `o` | 23 | 0.8 |
+| `oL` | 23 | 0.6 |
+
+The puzzles grade one decision each, so they measure tactics and say nothing about how a bot plays
+a whole game. Use them alongside a simulated matchup, never instead of one.
 
 ```bash
 cargo run --release -- simulate example_decks/venusaur-exeggutor.txt example_decks/weezing-arbok.txt --num 50 --players o,e --parallel
+cargo run --release -- simulate example_decks/venusaur-exeggutor.txt example_decks/weezing-arbok.txt --num 50 --players mL,l --parallel
 ```
 
 **Card Search Tool**
