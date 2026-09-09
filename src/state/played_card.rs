@@ -359,6 +359,35 @@ impl PlayedCard {
         self.damage_counters
     }
 
+    /// `base_hp + stadium_hp_bonus + ability_hp_bonus`, i.e. the HP this Pokemon has from its own
+    /// card plus the two board-wide bonuses the engine keeps in sync on this struct.
+    ///
+    /// Deliberately narrower than [`PlayedCard::get_effective_total_hp`], which also folds in the
+    /// four Tool HP capes and the per-attached-energy abilities. The learned value function's
+    /// feature vector is specified on this narrower number so that the Python extractor, which
+    /// only sees the three serialised fields, computes the same value from an exported state. See
+    /// `docs/value-features.md` section 3.3 in the Pocket Lab repo. Use
+    /// `get_effective_total_hp` for anything that is actually gameplay.
+    pub fn get_board_total_hp(&self) -> u32 {
+        self.base_hp + self.stadium_hp_bonus + self.ability_hp_bonus
+    }
+
+    /// [`PlayedCard::get_board_total_hp`] minus the damage counters, floored at zero.
+    pub fn get_board_remaining_hp(&self) -> u32 {
+        self.get_board_total_hp()
+            .saturating_sub(self.damage_counters)
+    }
+
+    /// The stored `double_grass_active` flag: whether Serperior's Jungle Totem is up for this
+    /// Pokemon's owner and this Pokemon is [G] type, so its attached [G] Energy counts double.
+    ///
+    /// [`PlayedCard::get_effective_attached_energy`] recomputes the same predicate from the live
+    /// board; this reads the cached flag, which is what an exported state carries and therefore
+    /// what the learned value function's feature vector is specified on.
+    pub fn has_double_grass_active(&self) -> bool {
+        self.double_grass_active
+    }
+
     /// Returns effective total HP considering abilities like Reuniclus Infinite Increase
     pub(crate) fn get_effective_total_hp(&self) -> u32 {
         let mut effective_hp = self.base_hp;

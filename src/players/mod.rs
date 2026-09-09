@@ -44,8 +44,14 @@ pub enum PlayerCode {
     W,
     M,
     V,
-    E { max_depth: usize },
+    E {
+        max_depth: usize,
+    },
     ER, // Evolution Rusher
+    /// ExpectiMiniMax with the learned value function (step 1 of the bot plan).
+    L {
+        max_depth: usize,
+    },
 }
 /// Custom parser function enforcing case-insensitivity
 pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
@@ -64,6 +70,15 @@ pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
         return Err(format!("Invalid player code: {s}. Use 'e<number>' for ExpectiMiniMax with depth, e.g., 'e2', 'e5'"));
     }
 
+    // Same shape for the learned value function: 'l' at depth 3, 'l<number>' for another depth.
+    if lower.starts_with('l') && lower.len() > 1 {
+        let rest = &lower[1..];
+        if let Ok(max_depth) = rest.parse::<usize>() {
+            return Ok(PlayerCode::L { max_depth });
+        }
+        return Err(format!("Invalid player code: {s}. Use 'l<number>' for ExpectiMiniMax with the learned value function and a depth, e.g., 'l2', 'l5'"));
+    }
+
     match lower.as_str() {
         "aa" => Ok(PlayerCode::AA),
         "et" => Ok(PlayerCode::ET),
@@ -74,6 +89,7 @@ pub fn parse_player_code(s: &str) -> Result<PlayerCode, String> {
         "v" => Ok(PlayerCode::V),
         "e" => Ok(PlayerCode::E { max_depth: 3 }), // Default depth
         "er" => Ok(PlayerCode::ER),
+        "l" => Ok(PlayerCode::L { max_depth: 3 }), // Default depth
         _ => Err(format!("Invalid player code: {s}")),
     }
 }
@@ -119,8 +135,18 @@ fn get_player(deck: Deck, player: &PlayerCode) -> Box<dyn Player> {
             deck,
             max_depth: *max_depth,
             write_debug_trees: false,
-            value_function: Box::new(value_functions::baseline_value_function),
+            value_function: value_functions::build_value_function(
+                value_functions::ValueFunctionKind::Baseline,
+            ),
         }),
         PlayerCode::ER => Box::new(EvolutionRusherPlayer { deck }),
+        PlayerCode::L { max_depth } => Box::new(ExpectiMiniMaxPlayer {
+            deck,
+            max_depth: *max_depth,
+            write_debug_trees: false,
+            value_function: value_functions::build_value_function(
+                value_functions::ValueFunctionKind::Learned,
+            ),
+        }),
     }
 }

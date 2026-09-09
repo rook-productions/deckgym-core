@@ -26,8 +26,8 @@ enum Commands {
         deck_b_or_folder: String,
 
         /// Players' strategies as a comma-separated list (e.g., "e2,e4" or "r,e5")
-        /// Available codes: aa, et, r, h, w, m, v, e<depth>, er
-        /// Example: e2 = ExpectiMiniMax with depth 2
+        /// Available codes: aa, et, r, h, w, m, v, e<depth>, er, l<depth>
+        /// Example: e2 = ExpectiMiniMax with depth 2, l3 = the same with the learned value function
         #[arg(long, value_delimiter = ',', value_parser = parse_player_code)]
         players: Option<Vec<PlayerCode>>,
 
@@ -71,8 +71,8 @@ enum Commands {
         num: u32,
 
         /// Players' strategies as a comma-separated list (e.g., "e2,e4" or "r,e5")
-        /// Available codes: aa, et, r, h, w, m, v, e<depth>, er
-        /// Example: e2 = ExpectiMiniMax with depth 2
+        /// Available codes: aa, et, r, h, w, m, v, e<depth>, er, l<depth>
+        /// Example: e2 = ExpectiMiniMax with depth 2, l3 = the same with the learned value function
         #[arg(long, value_delimiter = ',', value_parser = parse_player_code)]
         players: Option<Vec<PlayerCode>>,
 
